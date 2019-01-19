@@ -22,15 +22,15 @@ This project is derived from my blink01 (https://github.com/samsuanchen/blink01)
 
 05. On Arduino IDE, select Board.
 
-![width:50%; height:50%;](https://github.com/samsuanchen/blink02/blob/master/selectBoard.jpg)
+![width:50%; height:50%;](https://github.com/samsuanchen/blink02/blob/master/jpg/selectBoard.jpg)
 
 06. Select Port.
 
-![width:50%; height:50%;](https://github.com/samsuanchen/blink02/blob/master/selectPort.jpg)
+![width:50%; height:50%;](https://github.com/samsuanchen/blink02/blob/master/jpg/selectPort.jpg)
 
 07. Open interactive working console. 
 
-![width:50%; height:50%;](https://github.com/samsuanchen/blink02/blob/master/openConsole.jpg)
+![width:50%; height:50%;](https://github.com/samsuanchen/blink02/blob/master/jpg/openConsole.jpg)
 
 08. A forth script in test.txt as follows could be pasted into Arduino IDE input box:
 
@@ -47,8 +47,8 @@ This project is derived from my blink01 (https://github.com/samsuanchen/blink01)
         wbWHITE wbWHITE wb_setTextColor ( set text color )
         z" FVM02" 22 120 2 2 wb_drawString drop ( draw "Forth" )
 
-![width:50%; height:50%;](https://github.com/samsuanchen/blink02/blob/master/pasteScript.jpg)
+![width:50%; height:50%;](https://github.com/samsuanchen/blink02/blob/master/jpg/pasteScript.jpg)
 
 07. After clicking the button Send, an image, some lines, and some characters will be shown on wifiboy screen.
 
-![width:50%; height:50%;](https://github.com/samsuanchen/blink02/blob/master/drawScreen.jpg)
+![width:50%; height:50%;](https://github.com/samsuanchen/blink02/blob/master/jpg/drawScreen.jpg)
