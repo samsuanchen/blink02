@@ -4,7 +4,9 @@
   Turns an LED on for one second, then off for one second, repeatedly.
   Not using delay(), an alternative blink is given to run in the same feature of
   Arduino basic example Blink, http://www.arduino.cc/en/Tutorial/Blink.
-  More over, a virtual machine is running in the same time.
+  More over, a virtual machine is includeded and activated so that
+  while blinking we could do some thing else, for example to draw
+  image, lines, and characters on wifiboy screen.
 
   Most Arduinos have an on-board LED you can control. On the UNO, MEGA and ZERO
   it is attached to digital pin 13, on MKR1000 on pin 6. LED_BUILTIN is set to
@@ -32,7 +34,7 @@ int periodLOW = 1000;
 // the setup function runs once when you press reset or power the board
 void setup() {
 
-  extern Word* word_set;                            // ##### 3.1. request external word set (defined in fvm02_word_set.cpp)
+  extern Word* word_set;                            // ##### 3.1. load external word set (defined in fvm02_word_set.cpp)
   F.init( 115200, word_set );                       // ##### 3.2. in setup(), initialize F and the word set
   
   // set LED_BUILTIN as a digital output divice (pin level become LOW).
