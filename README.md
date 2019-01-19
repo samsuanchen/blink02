@@ -21,7 +21,7 @@ To update the virtual machine state, in loop(), 1 line is added into blink01:
 Once this code is running, in the same time while blinking, the virtual machine fvm02 is includeded and activated.
 
 On Arduino IDE, an interactive working console could be opened by clicking Tools/Serial Monitor. 
-![alt text](http://./blob/master/openConsole.jpg)
+![alt text](https://github.com/samsuanchen/blink02/blob/master/openConsole.jpg)
 
 A forth script in test.txt as follows could pasted into the Arduino IDE input box:
 
