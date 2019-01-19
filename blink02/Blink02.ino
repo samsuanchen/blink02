@@ -2,7 +2,7 @@
   Blink02
 
   Turns an LED on for one second, then off for one second, repeatedly.
-  Without delay(), an alternative blink is given to run in the same feature of
+  Not using delay(), an alternative blink is given to run in the same feature of
   Arduino basic example Blink, http://www.arduino.cc/en/Tutorial/Blink.
   More over, a virtual machine is running in the same time.
 
@@ -27,19 +27,13 @@ int changLevel;
 int periodHIGH = 1000;
 int periodLOW = 1000;
 
-void setPeriodHIGH() { periodHIGH=F.dPop(); }       // ##### 2.1. define the function setPeriodHIGH
-void setPeriodLOW()  { periodLOW =F.dPop(); }       // ##### 2.2. define the function setPeriodLOW
-
 #define LED_BUILTIN 16 // for wifiboy 32
 
 // the setup function runs once when you press reset or power the board
 void setup() {
-  
+
   extern Word* word_set;                            // ##### 3.1. request external word set (defined in fvm02_word_set.cpp)
   F.init( 115200, word_set );                       // ##### 3.2. in setup(), initialize F and the word set
-  
-  F.newPrimitive( "setPeriodHIGH", setPeriodHIGH ); // ##### 4.1. add new primitive word setPeriodHIGH of F
-  F.newPrimitive( "setPeriodLOW",  setPeriodLOW  ); // ##### 4.2. add new primitive word setPeriodLOW  of F
   
   // set LED_BUILTIN as a digital output divice (pin level become LOW).
   pinMode(LED_BUILTIN, OUTPUT);
@@ -63,7 +57,7 @@ void loop() {
 
     // next time and level to change
     timeChangeLevel += changLevel ? periodHIGH : periodLOW;
-    changLevel = HIGH - changLevel;
+    changLevel = changLevel ? LOW : HIGH;
     
   }
 
