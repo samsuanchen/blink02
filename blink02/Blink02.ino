@@ -1,5 +1,5 @@
 /*
-  Blink02
+  Blink02 https://github.com/samsuanchen/blink02
 
   Turns an LED on for one second, then off for one second, repeatedly.
   Not using delay(), an alternative blink is given to run in the same feature of
