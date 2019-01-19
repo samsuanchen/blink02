@@ -15,7 +15,7 @@
   model, check the Technical Specs of your board at:
   https://www.arduino.cc/en/Main/Products
 
-  derived from blink01, 4 lines added, 9 Jan 2019 by samsuanchen@gmail.com
+  derived from blink01, 5 lines added, 19 Jan 2019 by samsuanchen@gmail.com
 */
 
 #include <fvm02.h>                                  // ##### 1.1. load FVM the Forth virtual machine
