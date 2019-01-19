@@ -3,19 +3,19 @@ This project is derived from my blink01 (https://github.com/samsuanchen/blink01)
 
 01. To include virtual machine fvm02, 2 lines are added into blink01:
 
-    #include <fvm02.h>                                  // ##### 1.1. load FVM the Forth virtual machine
-    FVM F;                                              // ##### 1.2. define F as an instence of FVM
+        #include <fvm02.h>                                  // ##### 1.1. load FVM the Forth virtual machine
+        FVM F;                                              // ##### 1.2. define F as an instence of FVM
 
 
 02. To initialize the virtual machine and its word set, in setup(), 2 lines are added into blink01:
 
-      extern Word* word_set;                            // ##### 3.1. load external word set (defined in fvm02_word_set.cpp)
-      F.init( 115200, word_set );                       // ##### 3.2. in setup(), initialize F and the word set
+        extern Word* word_set;                            // ##### 3.1. load external word set (defined in fvm02_word_set.cpp)
+        F.init( 115200, word_set );                       // ##### 3.2. in setup(), initialize F and the word set
 
 
 03. To update the virtual machine state, in loop(), 1 line is added into blink01:
 
-      F.update();                                       // ##### 5. in loop(), update F state
+        F.update();                                       // ##### 5. in loop(), update F state
 
 
 04. Once this code is running, in the same time while blinking, the virtual machine fvm02 is includeded and activated.
@@ -47,7 +47,11 @@ This project is derived from my blink01 (https://github.com/samsuanchen/blink01)
         wbWHITE wbWHITE wb_setTextColor ( set text color )
         z" FVM02" 22 120 2 2 wb_drawString drop ( draw "Forth" )
 
+<<<<<<< HEAD
 ![width:50%; height:50%;](https://github.com/samsuanchen/blink02/blob/master/jpg/pasteScript.jpg)
+=======
+![width:30%; height:30%;](https://github.com/samsuanchen/blink02/blob/master/pasteScript.jpg)
+>>>>>>> 827814bf340d3efc13c15f9f0234e07492fad7fe
 
 07. After clicking the button Send, an image, some lines, and some characters will be shown on wifiboy screen.
 
