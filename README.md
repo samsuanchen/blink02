@@ -47,11 +47,7 @@ This project is derived from my blink01 (https://github.com/samsuanchen/blink01)
         wbWHITE wbWHITE wb_setTextColor ( set text color )
         z" FVM02" 22 120 2 2 wb_drawString drop ( draw "Forth" )
 
-<<<<<<< HEAD
 ![width:50%; height:50%;](https://github.com/samsuanchen/blink02/blob/master/jpg/pasteScript.jpg)
-=======
-![width:30%; height:30%;](https://github.com/samsuanchen/blink02/blob/master/pasteScript.jpg)
->>>>>>> 827814bf340d3efc13c15f9f0234e07492fad7fe
 
 07. After clicking the button Send, an image, some lines, and some characters will be shown on wifiboy screen.
 
