@@ -26,7 +26,7 @@ This project is derived from my blink01 (https://github.com/samsuanchen/blink01)
 
 06. Select Port.
 
-![width:50%; height:50%;](https://github.com/samsuanchen/blink02/blob/master/SelectPort.jpg)
+![width:50%; height:50%;](https://github.com/samsuanchen/blink02/blob/master/selectPort.jpg)
 
 07. Open interactive working console. 
 
