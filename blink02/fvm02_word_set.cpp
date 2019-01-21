@@ -6,838 +6,932 @@
 #include <wifiboy_lib.h>
 extern FVM F;
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
-static void _doCon(){ F.dPush( (F.T->W)->p.con ); } // push P field content of the running forth word to stack.
-static void _doVal(){ F.dPush( (F.T->W)->p.con ); } // push P field content of the running forth word to stack.
-static void _doVar(){ F.dPush( (int)( &((F.T->W)->p.con) ) ); } // push P field address of the running forth word to stack.
-static void _doCol(){ F.ipPush(), F.T->IP = (F.T->W)->p.wpl; } // setup calling word-list pointed by P field content of the running forth word.
-static void _ret(){ F.ipPop(); } // end of calling (return from word-list)
-static void _doLit(){ F.dPush((int)*(F.T->IP++)); } // push the value pointed by IP to stack.
-static void _doFor(){ F.rPush(F.dPop()); } // push loop counter from stack to rack.
-static void _doNext(){ int n=F.rPop(); if(n) F.rPush(--n), (F.T->IP)+=(int)*(F.T->IP); else (F.T->IP)++; } // pop and dec loop counter, push and loop back relatively if non-zero
-static void _zbran(){ if(F.dPop()==0) F.T->IP+=(int)*(F.T->IP); else F.T->IP++; } // pop flag and branch relatively if flag==0
-static void _bran(){ F.T->IP+=(int)*(F.T->IP); } // branch relatively 
-static void _compile(){ *((F.T->CP)++)=*((F.T->IP)++); } // compile the value pointed by IP
-static void _pto(){ Word *w=*(F.T->IP)++; w->p.con=F.dPop(); } // store value to P field of value type word pointed by IP
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 #define LAST 0
+#define WORD( name ) (Word*)&W ## name
+#define CONSTANT( id, flag, symbol, name, value ) const Word W ## name PROGMEM = { LAST, id, flag, symbol, _doCon, (int)value }
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // word set 0 ( handlers of different word types and programming control flows )
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W000 (con) ( -- a ) Get the address of constant type handler _doCon.
-const Word W_doCon PROGMEM={LAST, 0x000, HIDEN, "\x05" "(con)", _doCon, (int)_doCon };
-#define LAST (Word*)&W_doCon
+static void _doCon(){ F.dPush( F.T->W->p.con ); } // push P field content of the running forth word to stack.
+
+CONSTANT( 0x000, HIDEN, "\x05" "(con)", _doCon, _doCon );
+#define LAST WORD( _doCon )
+// const Word W_doCon PROGMEM = { LAST, 0x000, HIDEN, "\x05" "(con)", _doCon, (int)_doCon };
+// #define LAST WORD( _doCon ) 
+
 Word*firstDefined = LAST;
 //////////////////////////////////////////////////////////////////////////
 // W001 (val) ( -- a ) Get the address of value type handler _doVal.
-const Word W_doVal PROGMEM={LAST, 0x001, HIDEN, "\x05" "(val)", _doCon, (int)_doVal };
-#define LAST (Word*)&W_doVal
+static void _doVal(){ F.dPush( F.T->W->p.con ); } // push P field content of the running forth word to stack.
+
+CONSTANT( 0x001, HIDEN, "\x05" "(val)", _doVal, _doVal );
+#define LAST WORD( _doVal )
+// const Word W_doVal PROGMEM = { LAST, 0x001, HIDEN, "\x05" "(val)", _doCon, (int)_doVal };
+// #define LAST WORD( _doVal ) 
+
 //////////////////////////////////////////////////////////////////////////
 // W002 (var) ( -- a ) Get the address of variable type handler _doVar.
-const Word W_doVar PROGMEM={LAST, 0x002, HIDEN, "\x05" "(var)", _doCon, (int)_doVar };
-#define LAST (Word*)&W_doVar
+static void _doVar(){ F.dPush( (int)( &F.T->W->p.con ) ); } // push P field address of the running forth word to stack.
+
+CONSTANT( 0x002, HIDEN, "\x05" "(var)", _doVar, _doVar );
+#define LAST WORD( _doVar )
+// const Word W_doVar PROGMEM = { LAST, 0x002, HIDEN, "\x05" "(var)", _doCon, (int)_doVar };
+// #define LAST WORD( _doVar ) 
+
 //////////////////////////////////////////////////////////////////////////
 // W003 (col) ( -- )( -- w ip ) Get the address of colon type handler _doCol.
-const Word W_doCol PROGMEM={LAST, 0x003, HIDEN, "\x03" "(:)", _doCon, (int)_doCol };
-#define LAST (Word*)&W_doCol
+static void _doCol(){ F.ipPush(), F.T->IP = F.T->W->p.wpl; } // setup calling word-list pointed by P field content of the running forth word.
+
+CONSTANT( 0x003, HIDEN, "\x03" "(:)", _doCol, _doCol );
+#define LAST WORD( _doCol )
+// const Word W_doCol PROGMEM = { LAST, 0x003, HIDEN, "\x03" "(:)", _doCon, (int)_doCol };
+// #define LAST WORD( _doCol ) 
+
+#define PRIMITIVE( id, flag, symbol, name, func ) const Word W ## name PROGMEM = { LAST, id, flag, symbol, func, (int)#func }
+
 //////////////////////////////////////////////////////////////////////////
 // W004 (;) ( -- )( w ip -- ) end of colon type word definition (pop IP from return stack).
-const Word W_ret PROGMEM={LAST, 0x004, COMPO_HIDEN, "\x03" "(;)", _ret, (int)"_ret" };
-#define LAST (Word*)&W_ret
+static void _ret(){ F.ipPop(); } // end of calling (return from word-list)
+
+PRIMITIVE( 0x004, COMPO_HIDEN, "\x03" "(;)", _ret, _ret );
+#define LAST WORD( _ret )
+// PRIMITIVE( 0x004, COMPO_HIDEN, "\x03" "(;)", _ret, _ret );
+// #define LAST WORD( _ret ) 
+
 Word *w_doLit=LAST;
 //////////////////////////////////////////////////////////////////////////
 // W005 exit ( -- )( w ip -- ) Exit from colon type word definition (pop IP from return stack).
-const Word W_exit PROGMEM={LAST, 0x005, COMPO, "\x04" "exit", _ret, (int)"_ret" };
-#define LAST (Word*)&W_exit
+
+PRIMITIVE( 0x005, COMPO, "\x04" "exit", _exit, _ret );
+#define LAST WORD( _exit )
+// PRIMITIVE( 0x005, COMPO, "\x04" "exit", _exit, _ret );
+// #define LAST WORD( _exit ) 
+
 //////////////////////////////////////////////////////////////////////////
 // W006 (lit) ( -- n ) number in the next code cell pointed by IP.
-const Word W_doLit PROGMEM={LAST, 0x006, COMPO_HIDEN, "\x05" "(lit)", _doLit, (int)"_doLit" };
-#define LAST (Word*)&W_doLit
+static void _doLit(){ F.dPush( (int)*F.T->IP++ ); } // push the value pointed by IP to stack.
+
+PRIMITIVE( 0x006, COMPO_HIDEN, "\x05" "(lit)", _doLit, _doLit );
+#define LAST WORD( _doLit )
+// PRIMITIVE(  0x006, COMPO_HIDEN, "\x05" "(lit)", , _doLit, _doLit );
+// #define LAST WORD( _doLit ) 
+
 //////////////////////////////////////////////////////////////////////////
 // W007 (str) ( -- addr ) string addr in the code cell pointed by IP.
-const Word W_doStr PROGMEM={LAST, 0x007, COMPO_HIDEN, "\x05" "(str)", _doLit, (int)"_doLit" };
-#define LAST (Word*)&W_doStr
+
+PRIMITIVE( 0x007, COMPO_HIDEN, "\x05" "(str)", _doStr, _doLit );
+#define LAST WORD( _doStr )
+// PRIMITIVE( 0x007, COMPO_HIDEN, "\x05" "(str)", _doStr, _doLit );
+// #define LAST WORD( _doStr ) 
+
 //////////////////////////////////////////////////////////////////////////
 // W008 (for) ( n -- )( -- n ) push n to return stack as loop counter.
-const Word W_doFor PROGMEM={LAST, 0x008, COMPO_HIDEN, "\x05" "(for)", _doFor, (int)"_doFor" };
-#define LAST (Word*)&W_doFor
+static void _doFor(){ F.rPush( F.dPop() ); } // push loop counter from stack to rack.
+
+PRIMITIVE( 0x008, COMPO_HIDEN, "\x05" "(for)", _doFor, _doFor );
+#define LAST WORD( _doFor )
+// PRIMITIVE( 0x008, COMPO_HIDEN, "\x05" "(for)", _doFor, _doFor );
+// #define LAST WORD( _doFor ) 
+
 //////////////////////////////////////////////////////////////////////////
 // W009 (next) ( -- )( n -- n-1 | ) decreases loop counter n, branch back relatively to the word after (for) if n>0.
-const Word W_doNext PROGMEM={LAST, 0x009, COMPO_HIDEN, "\x06" "(next)", _doNext, (int)"_doNext" };
-#define LAST (Word*)&W_doNext
+static void _doNext(){ int n = F.rPop(); if( n ) F.rPush( --n ), F.T->IP += (int)*F.T->IP; else F.T->IP++; } // pop and dec loop counter, push and loop back relatively if non-zero
+
+PRIMITIVE( 0x009, COMPO_HIDEN, "\x06" "(next)", _doNext, _doNext );
+#define LAST WORD( _doNext )
+// PRIMITIVE( 0x009, COMPO_HIDEN, "\x06" "(next)", _doNext, _doNext );
+// #define LAST WORD( _doNext ) 
+
 //////////////////////////////////////////////////////////////////////////
 // W00a (if) ( flag -- ) branch forward relatively to the word after (else) or (then) if flag==0.
-const Word W_doIf PROGMEM={LAST, 0x00a, COMPO_HIDEN, "\x04" "(if)", _zbran, (int)"_zbran" };
-#define LAST (Word*)&W_doIf
+static void _zbran(){ if( F.dPop() == 0 ) F.T->IP += (int)*F.T->IP; else F.T->IP++; } // pop flag and branch relatively if flag==0
+
+PRIMITIVE( 0x00a, COMPO_HIDEN, "\x04" "(if)", _doIf, _zbran );
+#define LAST WORD( _doIf )
+// PRIMITIVE( 0x00a, COMPO_HIDEN, "\x04" "(if)", _doIf, _zbran );
+// #define LAST WORD( _doIf ) 
+
 //////////////////////////////////////////////////////////////////////////
 // W00b (else) ( -- ) branch forward relatively to the word after (then).
-const Word W_doElse PROGMEM={LAST, 0x00b, COMPO_HIDEN, "\x06" "(else)", _bran, (int)"_bran" };
-#define LAST (Word*)&W_doElse
+static void _bran(){ F.T->IP += (int)*F.T->IP; } // branch relatively 
+
+PRIMITIVE( 0x00b, COMPO_HIDEN, "\x06" "(else)", _doElse, _bran );
+#define LAST WORD( _doElse )
+// PRIMITIVE( 0x00b, COMPO_HIDEN, "\x06" "(else)", _doElse, _bran );
+// #define LAST WORD( _doElse ) 
+
 //////////////////////////////////////////////////////////////////////////
 // W00c (then) ( -- ) end of the if-then or the if-else-then control flow.
-const Word W_doThen PROGMEM={LAST, 0x00c, COMPO_HIDEN, "\x06" "(then)", 0, 0 };
-#define LAST (Word*)&W_doThen
+
+PRIMITIVE( 0x00c, COMPO_HIDEN, "\x06" "(then)", _doThen, 0 );
+#define LAST WORD( _doThen )
+// const Word W_doThen PROGMEM = { LAST, 0x00c, COMPO_HIDEN, "\x06" "(then)", 0, 0 };
+// #define LAST WORD( _doThen ) 
+
 //////////////////////////////////////////////////////////////////////////
 // W00d (begin) ( -- ) begin of the begin-again, begin-until, or begin-while-repeat control flows.
-const Word W_doBegin PROGMEM={LAST, 0x00d, COMPO_HIDEN, "\x07" "(begin)", 0, 0 };
-#define LAST (Word*)&W_doBegin
+
+PRIMITIVE( 0x00d, COMPO_HIDEN, "\x07" "(begin)", _doBegin, 0 );
+#define LAST WORD( _doBegin )
+// const Word W_doBegin PROGMEM = { LAST, 0x00d, COMPO_HIDEN, "\x07" "(begin)", 0, 0 };
+// #define LAST WORD( _doBegin ) 
+
 //////////////////////////////////////////////////////////////////////////
 // W00e (again) ( -- ) branch backward relatively to the word after (begin).
-const Word W_doAgain PROGMEM={LAST, 0x00e, COMPO_HIDEN, "\x07" "(again)", _bran, (int)"_bran" };
-#define LAST (Word*)&W_doAgain
+
+PRIMITIVE( 0x00e, COMPO_HIDEN, "\x07" "(again)", _doAgain, _bran );
+#define LAST WORD( _doAgain )
+// PRIMITIVE( 0x00e, COMPO_HIDEN, "\x07" "(again)", _doAgain, _bran );
+// #define LAST WORD( _doAgain ) 
+
 //////////////////////////////////////////////////////////////////////////
 // W00f (until) ( flag -- ) branch backward relatively to the word after (begin) if flag==0.
-const Word W_doUntil PROGMEM={LAST, 0x00f, COMPO_HIDEN, "\x07" "(until)", _zbran, (int)"_zbran" };
-#define LAST (Word*)&W_doUntil
+
+PRIMITIVE( 0x00f, COMPO_HIDEN, "\x07" "(until)", _doUntil, _zbran );
+#define LAST WORD( _doUntil )
+// PRIMITIVE( 0x00f, COMPO_HIDEN, "\x07" "(until)", _doUntil, _zbran );
+// #define LAST WORD( _doUntil ) 
+
 //////////////////////////////////////////////////////////////////////////
 // W010 (while) ( flag -- ) branch foreward relatively to the word after (repeat) if flag==0.
-const Word W_doWhile PROGMEM={LAST, 0x010, COMPO_HIDEN, "\x07" "(while)", _zbran, (int)"_zbran" };
-#define LAST (Word*)&W_doWhile
+
+PRIMITIVE( 0x010, COMPO_HIDEN, "\x07" "(while)", _doWhile, _zbran );
+#define LAST WORD( _doWhile )
+// PRIMITIVE( 0x010, COMPO_HIDEN, "\x07" "(while)", _doWhile, _zbran );
+// #define LAST WORD( _doWhile ) 
+
 //////////////////////////////////////////////////////////////////////////
 // W011 (repeat) ( -- ) branch backward relatively to the word after (begin).
-const Word W_doRepeat PROGMEM={LAST, 0x011, COMPO_HIDEN, "\x08" "(repeat)", _bran, (int)"_bran" };
-#define LAST (Word*)&W_doRepeat
+
+PRIMITIVE( 0x011, COMPO_HIDEN, "\x08" "(repeat)", _doRepeat, _bran );
+#define LAST WORD( _doRepeat )
+// PRIMITIVE( 0x011, COMPO_HIDEN, "\x08" "(repeat)", _doRepeat, _bran );
+// #define LAST WORD( _doRepeat ) 
+
 //////////////////////////////////////////////////////////////////////////
 // W012 (to) ( n -- ) store n to value type word which is in next code cell pointer by IP.
-const Word W_pto PROGMEM={LAST, 0x012, COMPO_HIDEN, "\x04" "(to)", _pto, (int)"_pto" };
-#define LAST (Word*)&W_pto
+static void _pto(){ Word *w =* F.T->IP++; w->p.con = F.dPop(); } // store value to P field of value type word pointed by IP
+
+PRIMITIVE( 0x012, COMPO_HIDEN, "\x04" "(to)", _pto, _pto );
+#define LAST WORD( _pto )
+// PRIMITIVE( 0x012, COMPO_HIDEN, "\x04" "(to)", _pto, _pto );
+// #define LAST WORD( _pto ) 
+
 //////////////////////////////////////////////////////////////////////////
 // W013 constant <name> ( n -- ) define constant type word of given name by n.
-static void _constant() { 
-  char*tkn=F.parseToken(' '); F.createWord( 0, F.voc->nWord, tkn, _doCon, F.dPop() ); }
-const Word W_constant PROGMEM={LAST, 0x013, 0, "\x08" "constant", _constant, (int)"_constant" };
-#define LAST (Word*)&W_constant
+static void _constant() { char*tkn = F.parseToken( ' ' ); F.createWord( 0, F.voc->nWord, tkn, _doCon, F.dPop() ); }
+
+PRIMITIVE( 0x013, 0, "\x08" "constant", _constant, _constant );
+#define LAST WORD( _constant )
+// PRIMITIVE( 0x013, 0, "\x08" "constant", _constant, _constant );
+// #define LAST WORD( _constant ) 
+
 //////////////////////////////////////////////////////////////////////////
 // W014 value <name> ( n -- ) define value type word of given name by n.
-static void _value() { 
-  char*tkn=F.parseToken(' '); F.createWord( 0, F.voc->nWord, tkn, _doVal, F.dPop() ); }
-const Word W_value PROGMEM={LAST, 0x014, 0, "\x05" "value", _value, (int)"_value" };
-#define LAST (Word*)&W_value
+static void _value() { char*tkn = F.parseToken( ' ' ); F.createWord( 0, F.voc->nWord, tkn, _doVal, F.dPop() ); }
+
+PRIMITIVE( 0x014, 0, "\x05" "value", _value, _value );
+#define LAST WORD( _value )
+// PRIMITIVE( 0x014, 0, "\x05" "value", _value, _value );
+// #define LAST WORD( _value ) 
+
 //////////////////////////////////////////////////////////////////////////
 // W015 to <name> ( n -- ) store number to the value type word of given name.
 static void _to() { 
-  char *name=F.parseToken(' ');
+  char*name = F.parseToken( ' ' );
   if ( ! name ) {
     ABORT( F.T->error, 601, F.initTib, "\"to <name>\" name of value type word not given ", 0 ); return; }
-  Word *w=F.vocSearch(name); // find the word of given name
+  Word*w = F.vocSearch( name ); // find the word of given name
   if ( ! w ) { ABORT( F.T->error, 602, F.initTib, "\"to %s\", 0x%x \"%s\" unDef", name+1, *(name), name+1 ); return; }
   if( (int)w->code != (&W_doVal)->p.con ) {
     ABORT( F.T->error, 603, F.initTib, "\"to %s\", %s not value type word ", name+1, name+1 ); return;
   }
   if ( F.T->state&CMPLING ) { // compiling
-    F.compile((Word*)&W_pto), F.compile(w); return;
+    F.compile( WORD( _pto ) ), F.compile( w ); return;
   }
-  w->p.con=F.dPop(); return; // pop number and store to value type word
+  w->p.con = F.dPop(); return; // pop number and store to value type word
 }
-const Word W_to PROGMEM={LAST, 0x015, IMMED, "\x02" "to", _to, (int)"_to" };
-#define LAST (Word*)&W_to
+
+PRIMITIVE( 0x015, IMMED, "\x02" "to", _to, _to );
+#define LAST WORD( _to )
+// PRIMITIVE( 0x015, IMMED, "\x02" "to", _to, _to );
+// #define LAST WORD( _to ) 
+
 //////////////////////////////////////////////////////////////////////////
 // W016 variable <name> ( -- ) define variable type word of given name.
-static void _variable() { char*tkn=F.parseToken(' '); F.createWord(0, F.voc->nWord, tkn, _doVar, 0 ); }
-const Word W_variable PROGMEM={LAST, 0x016, 0, "\x008variable", _variable, (int)"_variable" };
-#define LAST (Word*)&W_variable
+static void _variable() { char*tkn = F.parseToken(' '); F.createWord(0, F.voc->nWord, tkn, _doVar, 0 ); }
+
+PRIMITIVE( 0x016, 0, "\x08" "variable", _variable, _variable );
+#define LAST WORD( _variable )
+// PRIMITIVE( 0x016, 0, "\x08" "variable", _variable, _variable );
+// #define LAST WORD( _variable ) 
+
 //////////////////////////////////////////////////////////////////////////
 // W017 ] ( -- ) enter compiling state
-static void _rBracket() { (F.T->state)|=CMPLING; }
-const Word W_rBracket PROGMEM={LAST, 0x017, 0, "\x01" "]", _rBracket, (int)"_rBracket" };
-#define LAST (Word*)&W_rBracket
+static void _rBracket() { F.T->state |= CMPLING; }
+PRIMITIVE( 0x017, 0, "\x01" "]", _rBracket, _rBracket );
+#define LAST WORD( _rBracket ) 
 //////////////////////////////////////////////////////////////////////////
 // W018 [ ( -- ) leave compiling state.
-static void _lBracket() { (F.T->state)^=CMPLING; }
-const Word W_lBracket PROGMEM={LAST, 0x018, IMMED, "\x01" "[", _lBracket, (int)"_lBracket" };
-#define LAST (Word*)&W_lBracket
+static void _lBracket() { F.T->state ^= CMPLING; }
+PRIMITIVE( 0x018, IMMED, "\x01" "[", _lBracket, _lBracket );
+#define LAST WORD( _lBracket ) 
 //////////////////////////////////////////////////////////////////////////
 // W019 : <name> ( -- ) define colon type word of given name.
 static void _colon() { char *tkn=F.parseToken(' ');
   Word *w = F.createWord(0, F.voc->nWord, tkn, _doCol, 0); F.cpInit(), _rBracket(); }
-const Word W_colon PROGMEM={LAST, 0x019, 0, "\x01" ":", _colon, (int)"_colon" };
-#define LAST (Word*)&W_colon
+PRIMITIVE( 0x019, 0, "\x01" ":", _colon, _colon );
+#define LAST WORD( _colon ) 
 //////////////////////////////////////////////////////////////////////////
 // W01a ; ( -- ) end of colon type word definition.
-static void _semicolon() { 
-    F.compile((Word*)&W_ret); Word *w=F.T->last;
-    w->p.wpl = F.cpClone(); F.vocAdd(w), _lBracket(); }
-const Word W_semicolon PROGMEM={LAST, 0x01a, IMMED, "\x01" ";", _semicolon, (int)"_semicolon" };
-#define LAST (Word*)&W_semicolon
+static void _semicolon() { F.compile( WORD( _ret ) ); Word *w = F.T->last;
+    w->p.wpl = F.cpClone(); F.vocAdd( w ), _lBracket(); }
+PRIMITIVE( 0x01a, IMMED, "\x01" ";", _semicolon, _semicolon );
+#define LAST WORD( _semicolon ) 
 //////////////////////////////////////////////////////////////////////////
 // W01b compile ( -- ) compile the forth word in the code cell pointed by IP.
-const Word W_compile PROGMEM={LAST, 0x01b, COMPO_HIDEN, "\x07" "compile", _compile, (int)"_compile" };
-#define LAST (Word*)&W_compile
+static void _compile(){ *F.T->CP++ = *F.T->IP++; } // compile the value pointed by IP
+PRIMITIVE( 0x01b, COMPO_HIDEN, "\x07" "compile", _compile, _compile );
+#define LAST WORD( _compile ) 
 //////////////////////////////////////////////////////////////////////////
 // W01c here ( -- addr ) end of compiled code.
 static void _here(){ F.dPush((int)F.T->CP); }
-const Word W_here PROGMEM={LAST, 0x01c, 0, "\x04" "here", _here, (int)"_here" };
-#define LAST (Word*)&W_here
+PRIMITIVE( 0x01c, 0, "\x04" "here", _here, _here );
+#define LAST WORD( _here ) 
 //////////////////////////////////////////////////////////////////////////
 // W01d comma ( n -- ) compile given number.
 static void _comma(){
 //PRINTF("\n_comma() 0x%x ",F.dPick(0));
   F.compile((Word*)F.dPop()); }
-const Word W_comma PROGMEM={LAST, 0x01d, 0, "\x01" ",", _comma, (int)"_comma" };
-#define LAST (Word*)&W_comma
+PRIMITIVE( 0x01d, 0, "\x01" ",", _comma, _comma );
+#define LAST WORD( _comma ) 
 //////////////////////////////////////////////////////////////////////////
 // W01e >r ( n -- )( -- n ) push number onto return stack.
 static void _toR () { F.rPush(F.dPop()); }
-const Word W_toR PROGMEM={LAST, 0x01e, 0, "\x02" ">r", _toR, (int)"_toR" };
-#define LAST (Word*)&W_toR
+PRIMITIVE( 0x01e, 0, "\x02" ">r", _toR, _toR );
+#define LAST WORD( _toR ) 
 //////////////////////////////////////////////////////////////////////////
 // W01f r@ ( -- n )( n -- n ) top number of return stack.
 static void _rFetch () { F.dPush(*(F.T->RP)); }
-const Word W_rFetch PROGMEM={LAST, 0x01f, 0, "\x02" "r@", _rFetch, (int)"_rFetch" };
-#define LAST (Word*)&W_rFetch
+PRIMITIVE( 0x01f, 0, "\x02" "r@", _rFetch, _rFetch );
+#define LAST WORD( _rFetch ) 
 //////////////////////////////////////////////////////////////////////////
 // W020 r> ( -- n )( n -- ) pop number from return stack.
 static void _rFrom () { F.dPush(F.rPop()); }
-const Word W_rFrom PROGMEM={LAST, 0x020, 0, "\x02" "r>", _rFrom, (int)"_rFrom" };
-#define LAST (Word*)&W_rFrom
+PRIMITIVE( 0x020, 0, "\x02" "r>", _rFrom, _rFrom );
+#define LAST WORD( _rFrom ) 
 //////////////////////////////////////////////////////////////////////////
 // W021 - ( a b -- a-b ) difference of 2 integer numbers, a-b.
 static void _sub () { *(F.T->DP)-=F.dPop(); }
-const Word W_sub PROGMEM={LAST, 0x021, 0, "\x01" "-", _sub, (int)"_sub" };
-#define LAST (Word*)&W_sub
+PRIMITIVE( 0x021, 0, "\x01" "-", _sub, _sub );
+#define LAST WORD( _sub ) 
 //////////////////////////////////////////////////////////////////////////
 // W022 cell/ ( n -- n/4 ) divide given integer number by 4.
 static void _4slash () { (*(F.T->DP))/=4; }
-const Word W_4slash PROGMEM={LAST, 0x022, 0, "\x05" "cell/", _4slash, (int)"_4slash" };
-#define LAST (Word*)&W_4slash
+PRIMITIVE( 0x022, 0, "\x05" "cell/", _4slash, _4slash );
+#define LAST WORD( _4slash ) 
 //////////////////////////////////////////////////////////////////////////
 // W023 ! ( n addr -- ) store 32-bit number into given memory address.
 static void _store () { int *a=(int*)F.dPop(); *a=F.dPop(); }
-const Word W_store PROGMEM={LAST, 0x023, 0, "\x01" "!", _store, (int)"_store" };
-#define LAST (Word*)&W_store
+PRIMITIVE( 0x023, 0, "\x01" "!", _store, _store );
+#define LAST WORD( _store ) 
 //////////////////////////////////////////////////////////////////////////
 // W024 over ( n1 n0  -- n1 n0 n1 ) copy the next number on top to data stack.
 static void _over () { F.dPush(F.dPick(1)); }
-const Word W_over PROGMEM={LAST, 0x024, 0, "\x04" "over", _over, (int)"_over" };
-#define LAST (Word*)&W_over
+PRIMITIVE( 0x024, 0, "\x04" "over", _over, _over );
+#define LAST WORD( _over ) 
 //////////////////////////////////////////////////////////////////////////
 // W025 swap ( n1 n0  -- n0 n1 ) swap top 2 numbers of data stack.
 static void _swap () { F.dRoll(1); }
-const Word W_swap PROGMEM={LAST, 0x025, 0, "\x04" "swap", _swap, (int)"_swap" };
-#define LAST (Word*)&W_swap
+PRIMITIVE( 0x025, 0, "\x04" "swap", _swap, _swap );
+#define LAST WORD( _swap ) 
 //////////////////////////////////////////////////////////////////////////
 // W026 if ( -- a ) begin TRUE-part control flow (until "else" or "then").
 const Word* L_if[] PROGMEM = { &W_compile, &W_doIf, &W_here, &W_doLit, (Word*)0, &W_comma, &W_ret };
-const Word W_if PROGMEM={LAST, 0x026, IMMED_COMPO, "\x02" "if", _doCol, (int)L_if };
-#define LAST (Word*)&W_if
+const Word W_if PROGMEM = { LAST, 0x026, IMMED_COMPO, "\x02" "if", _doCol, (int)L_if };
+#define LAST WORD( _if ) 
 //////////////////////////////////////////////////////////////////////////
 // W027 else ( a -- a' ) begin FALSE-part control flow (until "then").
 const Word* L_else[] PROGMEM = { &W_toR, &W_compile, &W_doElse, &W_here, &W_doLit, (Word*)0, &W_comma,
   &W_here, &W_rFetch, &W_sub, &W_4slash, &W_rFrom, &W_store, &W_ret };
-const Word W_else PROGMEM={LAST, 0x027, IMMED_COMPO, "\x04" "else", _doCol, (int)L_else };
-#define LAST (Word*)&W_else
+const Word W_else PROGMEM = { LAST, 0x027, IMMED_COMPO, "\x04" "else", _doCol, (int)L_else };
+#define LAST WORD( _else ) 
 //////////////////////////////////////////////////////////////////////////
 // W028 then ( a -- ) end of TRUE-part or FALSE-part control flow.
 const Word* L_then[] PROGMEM = { &W_here, &W_over, &W_sub, &W_4slash, &W_swap, &W_store, &W_ret };
-const Word W_then PROGMEM={LAST, 0x028, IMMED_COMPO, "\x04" "then", _doCol, (int)L_then };
-#define LAST (Word*)&W_then
+const Word W_then PROGMEM = { LAST, 0x028, IMMED_COMPO, "\x04" "then", _doCol, (int)L_then };
+#define LAST WORD( _then ) 
 //////////////////////////////////////////////////////////////////////////
 // W029 for ( -- a ) begin of counted loop control flow (until "next").
 const Word* L_for[] PROGMEM = { &W_compile, &W_doFor, &W_here, &W_ret };
-const Word W_for PROGMEM={LAST, 0x029, IMMED_COMPO, "\x03" "for", _doCol, (int)L_for };
-#define LAST (Word*)&W_for
+const Word W_for PROGMEM = { LAST, 0x029, IMMED_COMPO, "\x03" "for", _doCol, (int)L_for };
+#define LAST WORD( _for ) 
 //////////////////////////////////////////////////////////////////////////
 // W02a next ( a -- ) end of counted loop control flow.
 const Word* L_next[] PROGMEM = { &W_compile, &W_doNext, &W_here, &W_sub, &W_4slash, &W_comma, &W_ret };
-const Word W_next PROGMEM={LAST, 0x02a, IMMED_COMPO, "\x04" "next", _doCol, (int)L_next };
-#define LAST (Word*)&W_next
+const Word W_next PROGMEM = { LAST, 0x02a, IMMED_COMPO, "\x04" "next", _doCol, (int)L_next };
+#define LAST WORD( _next ) 
 //////////////////////////////////////////////////////////////////////////
 // W02b begin ( -- a ) begin of loop control flow (until "again", "until", or "while").
 const Word* L_begin[] PROGMEM = { &W_compile, &W_doBegin, &W_here, &W_ret };
-const Word W_begin PROGMEM={LAST, 0x02b, IMMED_COMPO, "\x05" "begin", _doCol, (int)L_begin };
-#define LAST (Word*)&W_begin
+const Word W_begin PROGMEM = { LAST, 0x02b, IMMED_COMPO, "\x05" "begin", _doCol, (int)L_begin };
+#define LAST WORD( _begin ) 
 //////////////////////////////////////////////////////////////////////////
 // W02c again ( a -- ) end of infinite loop control flow.
 const Word* L_again[] PROGMEM = { &W_compile, &W_doAgain, &W_here, &W_sub, &W_4slash, &W_comma, &W_ret };
-const Word W_again PROGMEM={LAST, 0x02c, IMMED_COMPO, "\x05" "again", _doCol, (int)L_again };
-#define LAST (Word*)&W_again
+const Word W_again PROGMEM = { LAST, 0x02c, IMMED_COMPO, "\x05" "again", _doCol, (int)L_again };
+#define LAST WORD( _again ) 
 //////////////////////////////////////////////////////////////////////////
 // W02d until ( a -- ) end of loop control flow.
 const Word* L_until[] PROGMEM = { &W_compile, &W_doUntil, &W_here, &W_sub, &W_4slash, &W_comma, &W_ret };
-const Word W_until PROGMEM={LAST, 0x02d, IMMED_COMPO, "\x05" "until", _doCol, (int)L_until };
-#define LAST (Word*)&W_until
+const Word W_until PROGMEM = { LAST, 0x02d, IMMED_COMPO, "\x05" "until", _doCol, (int)L_until };
+#define LAST WORD( _until ) 
 //////////////////////////////////////////////////////////////////////////
 // W02e while ( a -- a b ) begin TRUE-part loop control flow (until "repeat").
 const Word* L_while[] PROGMEM = { &W_compile, &W_doWhile, &W_here, &W_doLit, (Word*)0, &W_comma, &W_ret };
-const Word W_while PROGMEM={LAST, 0x02e, IMMED_COMPO, "\x05" "while", _doCol, (int)L_while };
-#define LAST (Word*)&W_while
+const Word W_while PROGMEM = { LAST, 0x02e, IMMED_COMPO, "\x05" "while", _doCol, (int)L_while };
+#define LAST WORD( _while ) 
 //////////////////////////////////////////////////////////////////////////
 // W02f repeat ( a b -- ) end of TRUE-part loop control flow.
 const Word* L_repeat[] PROGMEM = { &W_compile, &W_doRepeat, &W_swap, &W_here, &W_sub, &W_4slash, &W_comma, 
   &W_here, &W_over, &W_sub, &W_4slash, &W_swap, &W_store, &W_ret };
-const Word W_repeat PROGMEM={LAST, 0x02f, IMMED_COMPO, "\x06" "repeat", _doCol, (int)L_repeat };
-#define LAST (Word*)&W_repeat
+const Word W_repeat PROGMEM = { LAST, 0x02f, IMMED_COMPO, "\x06" "repeat", _doCol, (int)L_repeat };
+#define LAST WORD( _repeat ) 
 //////////////////////////////////////////////////////////////////////////
 // W030 immediate ( -- ) set the last defined forth word as immediate type.
 static void _immediate() { F.T->last->flag |= IMMED; }
-const Word W_immediate PROGMEM={LAST, 0x030, 0, "\x09" "immediate", _immediate, (int)"_immediate" };
-#define LAST (Word*)&W_immediate
+PRIMITIVE( 0x030, 0, "\x09" "immediate", _immediate, _immediate );
+#define LAST WORD( _immediate ) 
 //////////////////////////////////////////////////////////////////////////
 // W031 compile-only ( -- ) set the last defined word as compile-only type.
 static void _compile_only() { F.T->last->flag |= COMPO; }
-const Word W_compile_only PROGMEM={LAST, 0x031, 0, "\x0c" "compile-only", _compile_only, (int)"_compile_only" };
-#define LAST (Word*)&W_compile_only
+PRIMITIVE( 0x031, 0, "\x0c" "compile-only", _compile_only, _compile_only );
+#define LAST WORD( _compile_only ) 
 //////////////////////////////////////////////////////////////////////////
 // W032 hidden ( -- ) set the last defined word as hidden type.
 static void _hidden() { F.T->last->flag |= HIDEN; }
-const Word W_hidden PROGMEM={LAST, 0x032, 0, "\x06" "hidden", _hidden, (int)"_hidden" };
-#define LAST (Word*)&W_hidden
+PRIMITIVE( 0x032, 0, "\x06" "hidden", _hidden, _hidden );
+#define LAST WORD( _hidden ) 
 //////////////////////////////////////////////////////////////////////////
 // W033 $" <string>" ( -- nStr ) create nString or compile nString.
 static void _strQ () { 
   char *tkn=F.parseToken('"');
-  if(F.T->state&CMPLING) F.compile((Word*)&W_doStr), F.compile( (Word*)tkn );
+  if(F.T->state&CMPLING) F.compile( WORD( _doStr ) ), F.compile( (Word*)tkn );
   else F.dPush( (int)tkn ); }
-const Word W_strQ PROGMEM={LAST, 0x033, IMMED, "\x02" "$\"", _strQ, (int)"_strQ" };
-#define LAST (Word*)&W_strQ
+PRIMITIVE( 0x033, IMMED, "\x02" "$\"", _strQ, _strQ );
+#define LAST WORD( _strQ ) 
 //////////////////////////////////////////////////////////////////////////
 // W034 ( <string>) ( -- ) ignore string delimited by right parenthesis.
 static void _paren() { F.parseToken(')'); }
-const Word W_paren PROGMEM={LAST, 0x034, IMMED, "\x01" "(", _paren, (int)"_paren" };
-#define LAST (Word*)&W_paren
+PRIMITIVE( 0x034, IMMED, "\x01" "(", _paren, _paren );
+#define LAST WORD( _paren ) 
 //////////////////////////////////////////////////////////////////////////
 // W035 literal ( n --  ) compile literal n.
-static void _literal() { F.compile((Word*)&W_doLit), F.compile( (Word*)F.dPop() ); }
-const Word W_literal PROGMEM={LAST, 0x035, IMMED_COMPO, "\x07" "literal", _literal, (int)"_literal" };
-#define LAST (Word*)&W_literal
+static void _literal() { F.compile( WORD( _doLit ) ), F.compile( (Word*)F.dPop() ); }
+PRIMITIVE( 0x035, IMMED_COMPO, "\x07" "literal", _literal, _literal );
+#define LAST WORD( _literal ) 
 //////////////////////////////////////////////////////////////////////////
 // W036 ? ( addr -- ) print 32-bit integer at given memory address.
 static void _quest(){ F.dot( *(int*)( F.dPop() ) ); } //
-const Word W_quest PROGMEM={LAST, 0x036, 0, "\x01" "?", _quest, (int)"_quest" };
-#define LAST (Word*)&W_quest
+PRIMITIVE( 0x036, 0, "\x01" "?", _quest, _quest );
+#define LAST WORD( _quest ) 
 //////////////////////////////////////////////////////////////////////////
 // W037 last ( -- addr ) in given address, pointer to the forth word just created (may not in vocabulary yet).
 static void _last() { F.dPush( (int) &(F.T->last) ); }
-const Word W_last PROGMEM={LAST, 0x037, 0, "\x04" "last", _last, (int)"_last" };
-#define LAST (Word*)&W_last
+PRIMITIVE( 0x037, 0, "\x04" "last", _last, _last );
+#define LAST WORD( _last ) 
 //////////////////////////////////////////////////////////////////////////
 // W038 <# ( i -- i ) begin to convert integer to digits string.
 static void _bToDigits() { F.T->hld = F.tmp+TMP_SIZE-1, *(F.T->hld)=0; }
-const Word W_bToDigits PROGMEM={LAST, 0x038, 0, "\x02" "<#", _bToDigits, (int)"_bToDigits" };
-#define LAST (Word*)&W_bToDigits
+PRIMITIVE( 0x038, 0, "\x02" "<#", _bToDigits, _bToDigits );
+#define LAST WORD( _bToDigits ) 
 //////////////////////////////////////////////////////////////////////////
 // W039 hold ( char -- ) insert given char to digits string (may be ',').
 static void _hold() { *(--(F.T->hld)) = F.dPop(); }
-const Word W_hold PROGMEM={LAST, 0x039, 0, "\x04" "hold", _hold, (int)"_hold" };
-#define LAST (Word*)&W_hold
+PRIMITIVE( 0x039, 0, "\x04" "hold", _hold, _hold );
+#define LAST WORD( _hold ) 
 //////////////////////////////////////////////////////////////////////////
 // W03a # ( i -- i/b ) convert i%b to a digit into tmp string buffer
 static void _toDigit() { uint i = *(F.T->DP); int8_t b = F.T->base;
   *(F.T->DP) = i/b; F.dPush(F.toDigit(i%b)); _hold(); }
-const Word W_toDigit PROGMEM={LAST, 0x03a, 0, "\x01" "#", _toDigit, (int)"_toDigit" };
-#define LAST (Word*)&W_toDigit
+PRIMITIVE( 0x03a, 0, "\x01" "#", _toDigit, _toDigit );
+#define LAST WORD( _toDigit ) 
 //////////////////////////////////////////////////////////////////////////
 // W03b #s ( i -- ) convert i to digits into tmp string buffer
 static void _toDigits() { while(*(F.T->DP)) _toDigit(); F.T->DP--; }
-const Word W_toDigits PROGMEM={LAST, 0x03b, 0, "\x02" "#s", _toDigits, (int)"_toDigits" };
-#define LAST (Word*)&W_toDigits
+PRIMITIVE( 0x03b, 0, "\x02" "#s", _toDigits, _toDigits );
+#define LAST WORD( _toDigits ) 
 //////////////////////////////////////////////////////////////////////////
 // W03c #> ( -- nStr ) end of number conversion, push the digits string onto data stack.
 static void _theDigits() { char*p = F.T->hld, n = strlen(p); *(--p) = n; F.dPush( (int)p ); }
-const Word W_theDigits PROGMEM={LAST, 0x03c, 0, "\x02" "#>", _theDigits, (int)"_theDigits" };
-#define LAST (Word*)&W_theDigits
+PRIMITIVE( 0x03c, 0, "\x02" "#>", _theDigits, _theDigits );
+#define LAST WORD( _theDigits ) 
 //////////////////////////////////////////////////////////////////////////
 // W03d z" <string>" ( -- zStr ) create zString or compile zString.
 static void _zstrQ () { 
   char *tkn=F.parseToken('"')+1;
-  if(F.T->state&CMPLING) F.compile((Word*)&W_doStr), F.compile( (Word*)tkn );
+  if(F.T->state&CMPLING) F.compile( WORD( _doStr ) ), F.compile( (Word*)tkn );
   else F.dPush( (int)tkn ); }
-const Word W_zstrQ PROGMEM={LAST, 0x033, IMMED, "\x02" "z\"", _zstrQ, (int)"_zstrQ" };
-#define LAST (Word*)&W_zstrQ
+PRIMITIVE( 0x033, IMMED, "\x02" "z\"", _zstrQ, _zstrQ );
+#define LAST WORD( _zstrQ ) 
 //////////////////////////////////////////////////////////////////////////
 // word set 1 ( number conversion base and memory access forth words )
 //////////////////////////////////////////////////////////////////////////
 // W100 binary ( -- ) set number conversion base = 2.
 static void _binary() { F.T->base=2; }
-const Word W_binary PROGMEM={LAST, 0x100, 0, "\x06" "binary", _binary, (int)"_binary" };
-#define LAST (Word*)&W_binary
+PRIMITIVE( 0x100, 0, "\x06" "binary", _binary, _binary );
+#define LAST WORD( _binary ) 
 //////////////////////////////////////////////////////////////////////////
 // W101 octal ( -- ) set number conversion base = 8.
 static void _octal() { F.T->base=8; }
-const Word W_octal PROGMEM={LAST, 0x101, 0, "\x05" "octal", _octal, (int)"_octal" };
-#define LAST (Word*)&W_octal
+PRIMITIVE( 0x101, 0, "\x05" "octal", _octal, _octal );
+#define LAST WORD( _octal ) 
 //////////////////////////////////////////////////////////////////////////
 // W102 decimal ( -- ) set number conversion base = 10.
 static void _decimal() { F.T->base=10; }
-const Word W_decimal PROGMEM={LAST, 0x102, 0, "\x07" "decimal", _decimal, (int)"_decimal" };
-#define LAST (Word*)&W_decimal
+PRIMITIVE( 0x102, 0, "\x07" "decimal", _decimal, _decimal );
+#define LAST WORD( _decimal ) 
 //////////////////////////////////////////////////////////////////////////
 // W103 hex ( -- ) set number conversion base = 16.
 static void _hex() { F.T->base=16; }
-const Word W_hex PROGMEM={LAST, 0x103, 0, "\x03" "hex", _hex, (int)"_hex" };
-#define LAST (Word*)&W_hex
+PRIMITIVE( 0x103, 0, "\x03" "hex", _hex, _hex );
+#define LAST WORD( _hex ) 
 //////////////////////////////////////////////////////////////////////////
 // W104 base ( -- a ) push address of number conversion base to stack.
 static void _base() { F.dPush((int)&(F.T->base)); }
-const Word W_base PROGMEM={LAST, 0x104, 0, "\x04" "base", _base, (int)"_base" };
-#define LAST (Word*)&W_base
+PRIMITIVE( 0x104, 0, "\x04" "base", _base, _base );
+#define LAST WORD( _base ) 
 //////////////////////////////////////////////////////////////////////////
 // W106 @ ( a -- i ) fetch 32-bit number from given memory address.
 static void _fetch () { F.dPush(*(int*)F.dPop()); }
-const Word W_fetch PROGMEM={LAST, 0x106, 0, "\x01" "@", _fetch, (int)"_fetch" };
-#define LAST (Word*)&W_fetch
+PRIMITIVE( 0x106, 0, "\x01" "@", _fetch, _fetch );
+#define LAST WORD( _fetch ) 
 //////////////////////////////////////////////////////////////////////////
 // W107 c! ( c a -- ) store 8-bit number into given memory address.
 static void _cStore() { uint8_t *p=(uint8_t *)F.dPop(); *p=(uint8_t)F.dPop(); }
-const Word W_cStore PROGMEM={LAST, 0x107, 0, "\x02" "c!", _cStore, (int)"_cStore" };
-#define LAST (Word*)&W_cStore
+PRIMITIVE( 0x107, 0, "\x02" "c!", _cStore, _cStore );
+#define LAST WORD( _cStore ) 
 //////////////////////////////////////////////////////////////////////////
 // W108 c@ ( a -- c ) fetch 8-bit char from given memory address.
 void _cFetch() { F.dPush(*(int8_t *)F.dPop()); }
-const Word W_cFetch PROGMEM={LAST, 0x108, 0, "\x02" "c@", _cFetch, (int)"_cFetch" };
-#define LAST (Word*)&W_cFetch
+PRIMITIVE( 0x108, 0, "\x02" "c@", _cFetch, _cFetch );
+#define LAST WORD( _cFetch ) 
 //////////////////////////////////////////////////////////////////////////
 // W109 . ( n -- ) print given integer number and a space.
 void _dot() { F.dot(F.dPop()); } 
-const Word W_dot PROGMEM={LAST, 0x109, 0, "\x01" ".", _dot, (int)"_dot" };
-#define LAST (Word*)&W_dot
+PRIMITIVE( 0x109, 0, "\x01" ".", _dot, _dot );
+#define LAST WORD( _dot ) 
 //////////////////////////////////////////////////////////////////////////
 // W10a .r ( n m -- ) print given integer number right aligned in m-char wide (fill leading spaces if needed).
 void _dotR() { int8_t n=F.dPop(); F.dotR(F.dPop(), n, ' '); } 
-const Word W_dotR PROGMEM={LAST, 0x10a, 0, "\x02" ".r", _dotR, (int)"_dotR" };
-#define LAST (Word*)&W_dotR
+PRIMITIVE( 0x10a, 0, "\x02" ".r", _dotR, _dotR );
+#define LAST WORD( _dotR ) 
 //////////////////////////////////////////////////////////////////////////
 // W10b .0r ( n m -- ) print given integer number right aligned in m-char wide (fill leading '0' if needed).
 void _dotZR() { int8_t n=F.dPop(); F.dotR(F.dPop(), n, '0'); } 
-const Word W_dotZR PROGMEM={LAST, 0x10b, 0, "\x03" ".0r", _dotZR, (int)"_dotZR" };
-#define LAST (Word*)&W_dotZR
+PRIMITIVE( 0x10b, 0, "\x03" ".0r", _dotZR, _dotZR );
+#define LAST WORD( _dotZR ) 
 //////////////////////////////////////////////////////////////////////////
 // W10c f. ( f -- ) print given floating number and a space.
 void _fDot() { X x; x.i=F.dPop(); PRINTF("%e ", x.f); } 
-const Word W_fDot PROGMEM={LAST, 0x10c, 0, "\x02" "f.", _fDot, (int)"_fDot" };
-#define LAST (Word*)&W_fDot
+PRIMITIVE( 0x10c, 0, "\x02" "f.", _fDot, _fDot );
+#define LAST WORD( _fDot ) 
 //////////////////////////////////////////////////////////////////////////
 // W10d >float ( i -- f ) convert number from integer to float.
 void _toFloat() { X x; x.f=(float)*(F.T->DP); *(F.T->DP)=x.i; } 
-const Word W_toFloat PROGMEM={LAST, 0x10d, 0, "\x06" ">float", _toFloat, (int)"_toFloat" };
-#define LAST (Word*)&W_toFloat
+PRIMITIVE( 0x10d, 0, "\x06" ">float", _toFloat, _toFloat );
+#define LAST WORD( _toFloat ) 
 //////////////////////////////////////////////////////////////////////////
 // W10e float> ( f -- i ) convert number from float to integer.
 void _floatFrom() { X x; x.i=*(F.T->DP); *(F.T->DP)=(int)(x.f); } 
-const Word W_floatFrom PROGMEM={LAST, 0x10e, 0, "\x06" "float>", _floatFrom, (int)"_floatFrom" };
-#define LAST (Word*)&W_floatFrom
+PRIMITIVE( 0x10e, 0, "\x06" "float>", _floatFrom, _floatFrom );
+#define LAST WORD( _floatFrom ) 
 //////////////////////////////////////////////////////////////////////////
 // W10f floor ( f -- f' ) the largest integer float not greater than given floating number.
 void _floor() { X x; x.i=*(F.T->DP); x.f=floor(x.f); *(F.T->DP)=x.i; } 
-const Word W_floor PROGMEM={LAST, 0x10f, 0, "\x05" "floor", _floor, (int)"_floor" };
-#define LAST (Word*)&W_floor
+PRIMITIVE( 0x10f, 0, "\x05" "floor", _floor, _floor );
+#define LAST WORD( _floor ) 
 //////////////////////////////////////////////////////////////////////////
 // W110 ceil ( f -- f' ) the smallest integer float not less than given floating number.
 void _ceil() { X x; x.i=*(F.T->DP); x.f=ceil(x.f); *(F.T->DP)=x.i; } 
-const Word W_ceil PROGMEM={LAST, 0x110, 0, "\x04" "ceil", _ceil, (int)"_ceil" };
-#define LAST (Word*)&W_ceil
+PRIMITIVE( 0x110, 0, "\x04" "ceil", _ceil, _ceil );
+#define LAST WORD( _ceil ) 
 //////////////////////////////////////////////////////////////////////////
 // W111 sin ( f -- sin(f) ) sine value of given angle (floating number expressed in radians).
 void _sin() { X x; x.i=*(F.T->DP); x.f=sin(x.f); *(F.T->DP)=x.i; } 
-const Word W_sin PROGMEM={LAST, 0x111, 0, "\x03" "sin", _sin, (int)"_sin" };
-#define LAST (Word*)&W_sin
+PRIMITIVE( 0x111, 0, "\x03" "sin", _sin, _sin );
+#define LAST WORD( _sin ) 
 //////////////////////////////////////////////////////////////////////////
 // W112 cos ( f -- cos(f) ) cosine value of given angle (floating number expressed in radians).
 void _cos() { X x; x.i=*(F.T->DP); x.f=cos(x.f); *(F.T->DP)=x.i; } 
-const Word W_cos PROGMEM={LAST, 0x112, 0, "\x03" "cos", _cos, (int)"_cos" };
-#define LAST (Word*)&W_cos
+PRIMITIVE( 0x112, 0, "\x03" "cos", _cos, _cos );
+#define LAST WORD( _cos ) 
 //////////////////////////////////////////////////////////////////////////
 // W113 exp ( f -- exp(f) ) exponential value of given floating number.
 void _exp() { X x; x.i=*(F.T->DP); x.f=exp(x.f); *(F.T->DP)=x.i; } 
-const Word W_exp PROGMEM={LAST, 0x113, 0, "\x03" "exp", _exp, (int)"_exp" };
-#define LAST (Word*)&W_exp
+PRIMITIVE( 0x113, 0, "\x03" "exp", _exp, _exp );
+#define LAST WORD( _exp ) 
 //////////////////////////////////////////////////////////////////////////
 // W114 pow ( x y -- pow(x,y) ) raise given floating number x to fractional power y.
 void _pow() { X x, y; x.i=F.dPop(), y.i=F.dPop(); x.f=pow((double)x.f,(double)y.f); *(F.T->DP)=x.i; } 
-const Word W_pow PROGMEM={LAST, 0x114, 0, "\x03" "pow", _pow, (int)"_pow" };
-#define LAST (Word*)&W_pow
+PRIMITIVE( 0x114, 0, "\x03" "pow", _pow, _pow );
+#define LAST WORD( _pow ) 
 //////////////////////////////////////////////////////////////////////////
 // W115 sqrt ( f -- sqrt(f) ) the square root of given floating number.
 void _sqrt() { X x; x.i=*(F.T->DP); x.f=sqrt(x.f); *(F.T->DP)=x.i; } 
-const Word W_sqrt PROGMEM={LAST, 0x115, 0, "\x04" "sqrt", _sqrt, (int)"_sqrt" };
-#define LAST (Word*)&W_sqrt
+PRIMITIVE( 0x115, 0, "\x04" "sqrt", _sqrt, _sqrt );
+#define LAST WORD( _sqrt ) 
 //////////////////////////////////////////////////////////////////////////
 // W116 tan ( f -- tan(f) ) tangent of an angle (given floating number expressed in radians).
 void _tan() { X x; x.i=*(F.T->DP); x.f=tan(x.f); *(F.T->DP)=x.i; } 
-const Word W_tan PROGMEM={LAST, 0x116, 0, "\x03" "tan", _tan, (int)"_tan" };
-#define LAST (Word*)&W_tan
+PRIMITIVE( 0x116, 0, "\x03" "tan", _tan, _tan );
+#define LAST WORD( _tan ) 
 //////////////////////////////////////////////////////////////////////////
 // W117 atan ( x -- atan(x) ) arc tangent (in radians) of given floating number.
 void _atan() { X x; x.i=*(F.T->DP); x.f=atan(x.f); *(F.T->DP)=x.i; } 
-const Word W_atan PROGMEM={LAST, 0x117, 0, "\x04" "atan", _atan, (int)"_atan" };
-#define LAST (Word*)&W_atan
+PRIMITIVE( 0x117, 0, "\x04" "atan", _atan, _atan );
+#define LAST WORD( _atan ) 
 //////////////////////////////////////////////////////////////////////////
 // W118 atan2 ( y x -- tan2(y,x) ) arc tangent of 2 floating numbers y and x, y/x.
 void _atan2() { X y, x; x.i=F.dPop(), y.i=*(F.T->DP); x.f=atan2(y.f,x.f); *(F.T->DP)=x.i; } 
-const Word W_atan2 PROGMEM={LAST, 0x118, 0, "\x05" "atan2", _atan2, (int)"_atan2" };
-#define LAST (Word*)&W_atan2
+PRIMITIVE( 0x118, 0, "\x05" "atan2", _atan2, _atan2 );
+#define LAST WORD( _atan2 ) 
 //////////////////////////////////////////////////////////////////////////
 // W119 f+ ( x y -- x+y ) sum of 2 floating numbers, x+y.
 void _fPlus() { X x, y; y.i=F.dPop(), x.i=*(F.T->DP); x.f+=y.f; *(F.T->DP)=x.i; } 
-const Word W_fPlus PROGMEM={LAST, 0x119, 0, "\x02" "f+", _fPlus, (int)"_atan2fPlus" };
-#define LAST (Word*)&W_fPlus
+const Word W_fPlus PROGMEM = { LAST, 0x119, 0, "\x02" "f+", _fPlus, (int)"_atan2fPlus" };
+#define LAST WORD( _fPlus ) 
 //////////////////////////////////////////////////////////////////////////
 // W11a f- ( x y -- x-y ) difference of 2 floating numbers, x-y.
 void _fMinus() { X x, y; y.i=F.dPop(), x.i=*(F.T->DP); x.f-=y.f; *(F.T->DP)=x.i; } 
-const Word W_fMinus PROGMEM={LAST, 0x11a, 0, "\x02" "f-", _fMinus, (int)"_fMinus" };
-#define LAST (Word*)&W_fMinus
+PRIMITIVE( 0x11a, 0, "\x02" "f-", _fMinus, _fMinus );
+#define LAST WORD( _fMinus ) 
 //////////////////////////////////////////////////////////////////////////
 // W11b f* ( x y -- x*y ) product of 2 floating numbers, x*y.
 void _fMul() { X x, y; y.i=F.dPop(), x.i=*(F.T->DP); x.f*=y.f; *(F.T->DP)=x.i; } 
-const Word W_fMul PROGMEM={LAST, 0x11b, 0, "\x02" "f*", _fMul, (int)"_fMul" };
-#define LAST (Word*)&W_fMul
+PRIMITIVE( 0x11b, 0, "\x02" "f*", _fMul, _fMul );
+#define LAST WORD( _fMul ) 
 //////////////////////////////////////////////////////////////////////////
 // W11c f/ ( x y -- x/y ) quotient of 2 floating numbers, x/y.
 void _fDiv() { X x, y; y.i=F.dPop(), x.i=*(F.T->DP); x.f/=y.f; *(F.T->DP)=x.i; } 
-const Word W_fDiv PROGMEM={LAST, 0x11c, 0, "\x02" "f/", _fDiv, (int)"_fDiv" };
-#define LAST (Word*)&W_fDiv
+PRIMITIVE( 0x11c, 0, "\x02" "f/", _fDiv, _fDiv );
+#define LAST WORD( _fDiv ) 
 //////////////////////////////////////////////////////////////////////////
 // W11d f% ( x y -- x%y ) remainder of 2 floating numbers, x%y.
 void _fMod() { X x, y; y.i=F.dPop(), x.i=*(F.T->DP); x.f=fmod(x.f,y.f); *(F.T->DP)=x.i; } 
-const Word W_fMod PROGMEM={LAST, 0x11d, 0, "\x02" "f%", _fMod, (int)"_fMod" };
-#define LAST (Word*)&W_fMod
+PRIMITIVE( 0x11d, 0, "\x02" "f%", _fMod, _fMod );
+#define LAST WORD( _fMod ) 
 //////////////////////////////////////////////////////////////////////////
 // W11e fAbs ( x -- abs(x) ) absolute value of given floating number.
 void _fAbs() { X x; x.i=*(F.T->DP); x.f=fabs(x.f); *(F.T->DP)=x.i; } 
-const Word W_fAbs PROGMEM={LAST, 0x11e, 0, "\x04" "fAbs", _fAbs, (int)"_fAbs" };
-#define LAST (Word*)&W_fAbs
+PRIMITIVE( 0x11e, 0, "\x04" "fAbs", _fAbs, _fAbs );
+#define LAST WORD( _fAbs ) 
 //////////////////////////////////////////////////////////////////////////
 // W11f log ( x -- log(x) ) natural logarithm of given floating number.
 void _log() { X x; x.i=*(F.T->DP); x.f=log(x.f); *(F.T->DP)=x.i; } 
-const Word W_log PROGMEM={LAST, 0x11f, 0, "\x03" "log", _log, (int)"_log" };
-#define LAST (Word*)&W_log
+PRIMITIVE( 0x11f, 0, "\x03" "log", _log, _log );
+#define LAST WORD( _log ) 
 //////////////////////////////////////////////////////////////////////////
 // W120 log10 ( x -- log10(x) ) logarithm of given floating number to base 10.
 void _log10() { X x; x.i=*(F.T->DP); x.f=log10(x.f); *(F.T->DP)=x.i; } 
-const Word W_log10 PROGMEM={LAST, 0x120, 0, "\x05" "log10", _log10, (int)"_log10" };
-#define LAST (Word*)&W_log10
+PRIMITIVE( 0x120, 0, "\x05" "log10", _log10, _log10 );
+#define LAST WORD( _log10 ) 
 //////////////////////////////////////////////////////////////////////////
 // word set 2 ( arithmetic and stack operation words )
 //////////////////////////////////////////////////////////////////////////
 // W200 + ( a b -- a+b ) sum of 2 integer numbers, a+b.
 static void _add () { *(F.T->DP)+=F.dPop(); }
-const Word W_add PROGMEM={LAST, 0x200, 0, "\x01" "+", _add, (int)"_add" };
-#define LAST (Word*)&W_add
+PRIMITIVE( 0x200, 0, "\x01" "+", _add, _add );
+#define LAST WORD( _add ) 
 //////////////////////////////////////////////////////////////////////////
 // W201 * ( a b -- a*b ) product of 2 integer numbers, a*b.
 static void _mul () { *(F.T->DP)*=F.dPop(); }
-const Word W_mul PROGMEM={LAST, 0x201, 0, "\x01" "*", _mul, (int)"_mul" };
-#define LAST (Word*)&W_mul
+PRIMITIVE( 0x201, 0, "\x01" "*", _mul, _mul );
+#define LAST WORD( _mul ) 
 //////////////////////////////////////////////////////////////////////////
 // W202 / ( a b -- a/b ) quotient of 2 integer numbers, a/b.
 static void _div () { *(F.T->DP)/=F.dPop(); }
-const Word W_div PROGMEM={LAST, 0x202, 0, "\x01" "/", _div, (int)"_div" };
-#define LAST (Word*)&W_div
+PRIMITIVE( 0x202, 0, "\x01" "/", _div, _div );
+#define LAST WORD( _div ) 
 //////////////////////////////////////////////////////////////////////////
 // W203 mod ( a b -- a%b ) remainder of 2 integer numbers, a%b.
 static void _mod () { *(F.T->DP)%=F.dPop(); }
-const Word W_mod PROGMEM={LAST, 0x203, 0, "\x03" "mod", _mod, (int)"_mod" };
-#define LAST (Word*)&W_mod
+PRIMITIVE( 0x203, 0, "\x03" "mod", _mod, _mod );
+#define LAST WORD( _mod ) 
 //////////////////////////////////////////////////////////////////////////
 // W204 negate ( n -- -n ) negative value of given integer number.
 static void _negate () { *(F.T->DP)=-*(F.T->DP); }
-const Word W_negate PROGMEM={LAST, 0x204, 0, "\x06" "negate", _negate, (int)"_negate" };
-#define LAST (Word*)&W_negate
+PRIMITIVE( 0x204, 0, "\x06" "negate", _negate, _negate );
+#define LAST WORD( _negate ) 
 //////////////////////////////////////////////////////////////////////////
 // W205 abs ( n -- abs(n) ) absolute value of given integer number.
 static void _abs () { int v=F.dPop(); F.dPush( abs(v) ); }
-const Word W_abs PROGMEM={LAST, 0x205, 0, "\x03" "abs", _abs, (int)"_abs" };
-#define LAST (Word*)&W_abs
+PRIMITIVE( 0x205, 0, "\x03" "abs", _abs, _abs );
+#define LAST WORD( _abs ) 
 //////////////////////////////////////////////////////////////////////////
 // W206 max ( a b -- max(a,b) )  maximum value of 2 integer numbers a and b,
 static void _max_ () { int b=F.dPop(), a=F.dPop(); F.dPush( a>b?a:b ); }
-const Word W_max PROGMEM={LAST, 0x206, 0, "\x03" "max", _max_, (int)"_max_" };
-#define LAST (Word*)&W_max
+PRIMITIVE( 0x206, 0, "\x03" "max", _max, _max_ );
+#define LAST WORD( _max ) 
 //////////////////////////////////////////////////////////////////////////
 // W207 min ( a b -- min(a,b) )  minimum value of a and b
 static void _min_ () { int b=F.dPop(), a=F.dPop(); F.dPush( a<b?a:b ); }
-const Word W_min PROGMEM={LAST, 0x207, 0, "\x03" "min", _min_, (int)"_min_" };
-#define LAST (Word*)&W_min
+PRIMITIVE( 0x207, 0, "\x03" "min", _min, _min_ );
+#define LAST WORD( _min ) 
 //////////////////////////////////////////////////////////////////////////
 // W208 ** ( a b -- a**b ) raise given integer number a to a integer power b.
 static void _power () { float b=F.dPop(), a=F.dPop(); F.dPush(round(pow(a,b))); }
-const Word W_power PROGMEM={LAST, 0x208, 0, "\x02" "**", _power, (int)"_power" };
-#define LAST (Word*)&W_power
+PRIMITIVE( 0x208, 0, "\x02" "**", _power, _power );
+#define LAST WORD( _power ) 
 //////////////////////////////////////////////////////////////////////////
 // W209 iSqrt ( v -- v**.5 )  sqrt(v)
 static void _iSqrt () { float v=F.dPop(); F.dPush(round(sqrt(v))); }
-const Word W_iSqrt PROGMEM={LAST, 0x209, 0, "\x05" "iSqrt", _iSqrt, (int)"_iSqrt" };
-#define LAST (Word*)&W_iSqrt
+PRIMITIVE( 0x209, 0, "\x05" "iSqrt", _iSqrt, _iSqrt );
+#define LAST WORD( _iSqrt ) 
 //////////////////////////////////////////////////////////////////////////
 // W20a 1+ ( n -- n+1 ) increase given integer number by 1.
 static void _1plus () { (*(F.T->DP))++; }
-const Word W_1plus PROGMEM={LAST, 0x20a, 0, "\x02" "1+", _1plus, (int)"_1plus" };
-#define LAST (Word*)&W_1plus
+PRIMITIVE( 0x20a, 0, "\x02" "1+", _1plus, _1plus );
+#define LAST WORD( _1plus ) 
 //////////////////////////////////////////////////////////////////////////
 // W20b 2+ ( n -- n+2 ) increase given integer number by 2.
 static void _2plus () { (*(F.T->DP))+=2; }
-const Word W_2plus PROGMEM={LAST, 0x20b, 0, "\x02" "2+", _2plus, (int)"_2plus" };
-#define LAST (Word*)&W_2plus
+PRIMITIVE( 0x20b, 0, "\x02" "2+", _2plus, _2plus );
+#define LAST WORD( _2plus ) 
 //////////////////////////////////////////////////////////////////////////
 // W20c cell+ ( n -- n+4 ) increase given integer number by 4.
 static void _4plus () { (*(F.T->DP))+=4; }
-const Word W_4plus PROGMEM={LAST, 0x20c, 0, "\x05" "cell+", _4plus, (int)"_4plus" };
-#define LAST (Word*)&W_4plus
+PRIMITIVE( 0x20c, 0, "\x05" "cell+", _4plus, _4plus );
+#define LAST WORD( _4plus ) 
 //////////////////////////////////////////////////////////////////////////
 // W20d 1- ( n -- n-1 ) decrease given integer number by 1.
 static void _1minus () { (*(F.T->DP))--; }
-const Word W_1minus PROGMEM={LAST, 0x20d, 0, "\x02" "1-", _1minus, (int)"_1minus" };
-#define LAST (Word*)&W_1minus
+PRIMITIVE( 0x20d, 0, "\x02" "1-", _1minus, _1minus );
+#define LAST WORD( _1minus ) 
 //////////////////////////////////////////////////////////////////////////
 // W20e 2- ( n -- n-2 ) decrease given integer number by 2.
 static void _2minus () { (*(F.T->DP))-=2; }
-const Word W_2minus PROGMEM={LAST, 0x20e, 0, "\x02" "2-", _2minus, (int)"_2minus" };
-#define LAST (Word*)&W_2minus
+PRIMITIVE( 0x20e, 0, "\x02" "2-", _2minus, _2minus );
+#define LAST WORD( _2minus ) 
 //////////////////////////////////////////////////////////////////////////
 // W20f cell- ( n -- n-4 ) decrease given integer number by 4.
 static void _4minus () { (*(F.T->DP))-=4; }
-const Word W_4minus PROGMEM={LAST, 0x20f, 0, "\x05" "cell-", _4minus, (int)"_4minus" };
-#define LAST (Word*)&W_4minus
+PRIMITIVE( 0x20f, 0, "\x05" "cell-", _4minus, _4minus );
+#define LAST WORD( _4minus ) 
 //////////////////////////////////////////////////////////////////////////
 // W210 2* ( n -- n*2 ) multiply given integer number by 2.
 static void _2times () { (*(F.T->DP))*=2; }
-const Word W_2times PROGMEM={LAST, 0x210, 0, "\x02" "2*", _2times, (int)"_2times" };
-#define LAST (Word*)&W_2times
+PRIMITIVE( 0x210, 0, "\x02" "2*", _2times, _2times );
+#define LAST WORD( _2times ) 
 //////////////////////////////////////////////////////////////////////////
 // W211 cells ( n -- n*4 ) multiply given integer number by 4.
 static void _cells () { (*(F.T->DP))*=4; }
-const Word W_cells PROGMEM={LAST, 0x211, 0, "\x05" "cells", _cells, (int)"_cells" };
-#define LAST (Word*)&W_cells
+PRIMITIVE( 0x211, 0, "\x05" "cells", _cells, _cells );
+#define LAST WORD( _cells ) 
 //////////////////////////////////////////////////////////////////////////
 // W212 2/ ( n -- n/2 ) divide given integer number by 2.
 static void _2slash () { (*(F.T->DP))/=2; }
-const Word W_2slash PROGMEM={LAST, 0x212, 0, "\x02" "2/", _2slash, (int)"_2slash" };
-#define LAST (Word*)&W_2slash
+PRIMITIVE( 0x212, 0, "\x02" "2/", _2slash, _2slash );
+#define LAST WORD( _2slash ) 
 //////////////////////////////////////////////////////////////////////////
 // W214 dup ( n -- n n ) copy the top of data stack.
 static void _dup () { F.dPush( *(F.T->DP) ); }
-const Word W_dup PROGMEM={LAST, 0x214, 0, "\x03" "dup", _dup, (int)"_dup" };
-#define LAST (Word*)&W_dup
+PRIMITIVE( 0x214, 0, "\x03" "dup", _dup, _dup );
+#define LAST WORD( _dup ) 
 //////////////////////////////////////////////////////////////////////////
 // W215 pick ( ni .. n1 n0 i -- ni .. n1 n0 ni ) copy the top i-th of data stack.
 static void _pick () { F.dPush(F.dPick(F.dPop())); }
-const Word W_pick PROGMEM={LAST, 0x215, 0, "\x04" "pick", _pick, (int)"_pick" };
-#define LAST (Word*)&W_pick
+PRIMITIVE( 0x215, 0, "\x04" "pick", _pick, _pick );
+#define LAST WORD( _pick ) 
 //////////////////////////////////////////////////////////////////////////
 // W216 ?dup ( n -- n n | 0 ) copy the top of data stack if the top is not 0.
 static void _qdup () { if(*(F.T->DP)) F.dPush(*(F.T->DP)); }
-const Word W_qdup PROGMEM={LAST, 0x216, 0, "\x04" "?dup", _qdup, (int)"_qdup" };
-#define LAST (Word*)&W_qdup
+PRIMITIVE( 0x216, 0, "\x04" "?dup", _qdup, _qdup );
+#define LAST WORD( _qdup ) 
 //////////////////////////////////////////////////////////////////////////
 // W217 drop ( n -- ) drop the top of data stack.
 static void _drop () { F.T->DP--; }
-const Word W_drop PROGMEM={LAST, 0x217, 0, "\x04" "drop", _drop, (int)"_drop" };
-#define LAST (Word*)&W_drop
+PRIMITIVE( 0x217, 0, "\x04" "drop", _drop, _drop );
+#define LAST WORD( _drop ) 
 //////////////////////////////////////////////////////////////////////////
 // W218 nip ( n1 n0 -- n0 ) drop the top next of data stack.
 static void _nip () { int X=*(F.T->DP); F.T->DP-=2; F.dPush(X); }
-const Word W_nip PROGMEM={LAST, 0x218, 0, "\x03" "nip", _nip, (int)"_nip" };
-#define LAST (Word*)&W_nip
+PRIMITIVE( 0x218, 0, "\x03" "nip", _nip, _nip );
+#define LAST WORD( _nip ) 
 //////////////////////////////////////////////////////////////////////////
 // W21a rot ( n2 n1 n0  -- n1 n0 n2 ) roll n2 to top of data stack.
 static void _rot () { F.dRoll(2); }
-const Word W_rot PROGMEM={LAST, 0x21a, 0, "\x03" "rot", _rot, (int)"_rot" };
-#define LAST (Word*)&W_rot
+PRIMITIVE( 0x21a, 0, "\x03" "rot", _rot, _rot );
+#define LAST WORD( _rot ) 
 //////////////////////////////////////////////////////////////////////////
 // W21b roll ( ni .. n1 n0 i -- .. n1 n0 ni ) roll ni to top of data stack.
 static void _roll () { F.dRoll(F.dPop()); }
-const Word W_roll PROGMEM={LAST, 0x21b, 0, "\x04" "roll", _roll, (int)"_roll" };
-#define LAST (Word*)&W_roll
+PRIMITIVE( 0x21b, 0, "\x04" "roll", _roll, _roll );
+#define LAST WORD( _roll ) 
 //////////////////////////////////////////////////////////////////////////
 // W21c -rot ( n2 n1 n0  -- n0 n2 n1 ) back roll top of data stack to n2.
 static void _backRot () { F.dBackRoll(2); }
-const Word W_backRot PROGMEM={LAST, 0x21c, 0, "\x04" "-rot", _backRot, (int)"_backRot" };
-#define LAST (Word*)&W_backRot
+PRIMITIVE( 0x21c, 0, "\x04" "-rot", _backRot, _backRot );
+#define LAST WORD( _backRot ) 
 //////////////////////////////////////////////////////////////////////////
 // W21d -roll ( ni .. n1 n0 i -- n0 ni .. n1 ) back roll top of data stack to ni.
 static void _backRoll () { F.dBackRoll(F.dPop()); }
-const Word W_backRoll PROGMEM={LAST, 0x21d, 0, "\x05" "-roll", _backRoll, (int)"_backRoll" };
-#define LAST (Word*)&W_backRoll
+PRIMITIVE( 0x21d, 0, "\x05" "-roll", _backRoll, _backRoll );
+#define LAST WORD( _backRoll ) 
 //////////////////////////////////////////////////////////////////////////
 // W21e 2dup ( n1 n0 -- n1 n0 n1 n0 )  copy top double-number of data stack.
 static void _2dup () { _over(), _over(); }
-const Word W_2dup PROGMEM={LAST, 0x21e, 0, "\x04" "2dup", _2dup, (int)"_2dup" };
-#define LAST (Word*)&W_2dup
+PRIMITIVE( 0x21e, 0, "\x04" "2dup", _2dup, _2dup );
+#define LAST WORD( _2dup ) 
 //////////////////////////////////////////////////////////////////////////
 // W21f 2drop ( n1 n0 -- ) drop top double-number of data stack.
 static void _2drop () { F.T->DP-=2; }
-const Word W_2drop PROGMEM={LAST, 0x21f, 0, "\x05" "2drop", _2drop, (int)"_2drop" };
-#define LAST (Word*)&W_2drop
+PRIMITIVE( 0x21f, 0, "\x05" "2drop", _2drop, _2drop );
+#define LAST WORD( _2drop ) 
 //////////////////////////////////////////////////////////////////////////
 // W220 2over ( n3 n2 n1 n0 -- n3 n2 n1 n0 n3 n2 ) copy top next double-number of data stack.
 static void _2over () { F.dPush(F.dPick(3)), F.dPush(F.dPick(3)); }
-const Word W_2over PROGMEM={LAST, 0x220, 0, "\x05" "2over", _2over, (int)"_2over" };
-#define LAST (Word*)&W_2over
+PRIMITIVE( 0x220, 0, "\x05" "2over", _2over, _2over );
+#define LAST WORD( _2over ) 
 //////////////////////////////////////////////////////////////////////////
 // W221 2swap ( n3 n2 n1 n0  -- n1 n0 n3 n2 ) swap top 2 double-numbers of data stack.
 static void _2swap () { F.dRoll(3), F.dRoll(3); }
-const Word W_2swap PROGMEM={LAST, 0x221, 0, "\x05" "2swap", _2swap, (int)"_2swap" };
-#define LAST (Word*)&W_2swap
+PRIMITIVE( 0x221, 0, "\x05" "2swap", _2swap, _2swap );
+#define LAST WORD( _2swap ) 
 //////////////////////////////////////////////////////////////////////////
 // W225 and ( a b -- a&b ) bitwise AND operation of 2 given numbers.
 static void _and () { *(F.T->DP)&=F.dPop(); }
-const Word W_and PROGMEM={LAST, 0x225, 0, "\x03" "and", _and, (int)"_and" };
-#define LAST (Word*)&W_and
+PRIMITIVE( 0x225, 0, "\x03" "and", _and, _and );
+#define LAST WORD( _and ) 
 //////////////////////////////////////////////////////////////////////////
 // W226 or ( a b -- a|b ) bitwise OR operation of 2 given numbers.
 static void _or () { *(F.T->DP)|=F.dPop(); }
-const Word W_or PROGMEM={LAST, 0x226, 0, "\x02" "or", _or, (int)"_or" };
-#define LAST (Word*)&W_or
+PRIMITIVE( 0x226, 0, "\x02" "or", _or, _or );
+#define LAST WORD( _or ) 
 //////////////////////////////////////////////////////////////////////////
 // W227 xor ( a b -- a^b ) bitwise XOR operation of 2 given numbers.
 static void _xor () { *(F.T->DP)^=F.dPop(); }
-const Word W_xor PROGMEM={LAST, 0x227, 0, "\x03" "xor", _xor, (int)"_xor" };
-#define LAST (Word*)&W_xor
+PRIMITIVE( 0x227, 0, "\x03" "xor", _xor, _xor );
+#define LAST WORD( _xor ) 
 //////////////////////////////////////////////////////////////////////////
 // W228 not ( n -- n^-1 ) bitwise XOR given number by -1.
 static void _not () { *(F.T->DP)^=-1; }
-const Word W_not PROGMEM={LAST, 0x228, 0, "\x03" "not", _not, (int)"_not" };
-#define LAST (Word*)&W_not
+PRIMITIVE( 0x228, 0, "\x03" "not", _not, _not );
+#define LAST WORD( _not ) 
 //////////////////////////////////////////////////////////////////////////
 // W229 0= ( n -- n==0 ) check top integer on data stack if it is 0.
 static void _0eq () { *(F.T->DP) = *(F.T->DP)==0; }
-const Word W_0eq PROGMEM={LAST, 0x229, 0, "\x02" "0=", _0eq, (int)"_0eq" };
-#define LAST (Word*)&W_0eq
+PRIMITIVE( 0x229, 0, "\x02" "0=", _0eq, _0eq );
+#define LAST WORD( _0eq ) 
 //////////////////////////////////////////////////////////////////////////
 // W22a 0!= ( n -- n!=0 ) check top integer on data stack if it is not 0.
 static void _0ne () { *(F.T->DP) = *(F.T->DP)!=0; }
-const Word W_0ne PROGMEM={LAST, 0x22a, 0, "\x03" "0!=", _0ne, (int)"_0ne" };
-#define LAST (Word*)&W_0ne
+PRIMITIVE( 0x22a, 0, "\x03" "0!=", _0ne, _0ne );
+#define LAST WORD( _0ne ) 
 //////////////////////////////////////////////////////////////////////////
 // W22b 0< ( n -- n<0 ) check top integer on data stack if it is less than 0.
 static void _0lt () { *(F.T->DP) = *(F.T->DP)<0; }
-const Word W_0lt PROGMEM={LAST, 0x22b, 0, "\x02" "0<", _0lt, (int)"_0lt" };
-#define LAST (Word*)&W_0lt
+PRIMITIVE( 0x22b, 0, "\x02" "0<", _0lt, _0lt );
+#define LAST WORD( _0lt ) 
 //////////////////////////////////////////////////////////////////////////
 // W22c 0> ( n -- n>0 ) check top integer on data stack if it is greater than 0.
 static void _0gt () { *(F.T->DP) = *(F.T->DP)>0; }
-const Word W_0gt PROGMEM={LAST, 0x22c, 0, "\x02" "0>", _0gt, (int)"_0gt" };
-#define LAST (Word*)&W_0gt
+PRIMITIVE( 0x22c, 0, "\x02" "0>", _0gt, _0gt );
+#define LAST WORD( _0gt ) 
 //////////////////////////////////////////////////////////////////////////
 // W22d 0<= ( n -- n<=0 ) check top integer on data stack if it is not greater than 0.
 static void _0le () { *(F.T->DP) = *(F.T->DP)<=0; }
-const Word W_0le PROGMEM={LAST, 0x22d, 0, "\x03" "0<=", _0le, (int)"_0le" };
-#define LAST (Word*)&W_0le
+PRIMITIVE( 0x22d, 0, "\x03" "0<=", _0le, _0le );
+#define LAST WORD( _0le ) 
 //////////////////////////////////////////////////////////////////////////
 // W22e 0>= ( n -- n>=0 ) check top integer on data stack if it is not less than 0.
 static void _0ge () { *(F.T->DP) = *(F.T->DP)>=0; }
-const Word W_0ge PROGMEM={LAST, 0x22e, 0, "\x03" "0>=", _0ge, (int)"_0ge" };
-#define LAST (Word*)&W_0ge
+PRIMITIVE( 0x22e, 0, "\x03" "0>=", _0ge, _0ge );
+#define LAST WORD( _0ge ) 
 //////////////////////////////////////////////////////////////////////////
 // W22f = ( a b -- a==b ) check top 2 integers on data stack if they are equal.
 static void _eq () { int X=F.dPop(); *(F.T->DP) = *(F.T->DP)==X; }
-const Word W_eq PROGMEM={LAST, 0x22f, 0, "\x01" "=", _eq, (int)"_eq" };
-#define LAST (Word*)&W_eq
+PRIMITIVE( 0x22f, 0, "\x01" "=", _eq, _eq );
+#define LAST WORD( _eq ) 
 //////////////////////////////////////////////////////////////////////////
 // W230 != ( a b -- a!=b ) check top 2 integers on data stack if they are not equal.
 static void _ne () { int X=F.dPop(); *(F.T->DP) = *(F.T->DP)!=X; }
-const Word W_ne PROGMEM={LAST, 0x230, 0, "\x02" "!=", _ne, (int)"_ne" };
-#define LAST (Word*)&W_ne
+PRIMITIVE( 0x230, 0, "\x02" "!=", _ne, _ne );
+#define LAST WORD( _ne ) 
 //////////////////////////////////////////////////////////////////////////
 // W231 < ( a b -- a<b ) check top 2 integers on data stack if a<b.
 static void _lt () { int X=F.dPop(); *(F.T->DP) = *(F.T->DP)<X; }
-const Word W_lt PROGMEM={LAST, 0x231, 0, "\x01" "<", _lt, (int)"_lt" };
-#define LAST (Word*)&W_lt
+PRIMITIVE( 0x231, 0, "\x01" "<", _lt, _lt );
+#define LAST WORD( _lt ) 
 //////////////////////////////////////////////////////////////////////////
 // W232 > ( a b -- a>b ) check top 2 integers on data stack if a>b.
 static void _gt () { int X=F.dPop(); *(F.T->DP) = *(F.T->DP)>X; }
-const Word W_gt PROGMEM={LAST, 0x232, 0, "\x01" ">", _gt, (int)"_gt" };
-#define LAST (Word*)&W_gt
+PRIMITIVE( 0x232, 0, "\x01" ">", _gt, _gt );
+#define LAST WORD( _gt ) 
 //////////////////////////////////////////////////////////////////////////
 // W233 <= ( a b -- a<=b ) check top 2 integers on data stack if a<=b.
 static void _le () { int X=F.dPop(); *(F.T->DP) = *(F.T->DP)<=X; }
-const Word W_le PROGMEM={LAST, 0x233, 0, "\x02" "<=", _le, (int)"_le" };
-#define LAST (Word*)&W_le
+PRIMITIVE( 0x233, 0, "\x02" "<=", _le, _le );
+#define LAST WORD( _le ) 
 //////////////////////////////////////////////////////////////////////////
 // W234 >= ( a b -- a>=b ) check top 2 integers on data stack if a>=b.
 static void _ge () { int X=F.dPop(); *(F.T->DP) = *(F.T->DP)>=X; }
-const Word W_ge PROGMEM={LAST, 0x234, 0, "\x02" ">=", _ge, (int)"_ge" };
-#define LAST (Word*)&W_ge
+PRIMITIVE( 0x234, 0, "\x02" ">=", _ge, _ge );
+#define LAST WORD( _ge ) 
 //////////////////////////////////////////////////////////////////////////
 // W235 $= ( nStr1 nStr2 -- flag ) check if nStr1 == nStr2
 static void _strEq () { F.dPush(strcmp( (char*)F.dPop(), (char*)F.dPop() ) == 0 ); }
-const Word W_strEq PROGMEM={LAST, 0x235, 0, "\x02" "$=", _strEq, (int)"_strEq" };
-#define LAST (Word*)&W_strEq
+PRIMITIVE( 0x235, 0, "\x02" "$=", _strEq, _strEq );
+#define LAST WORD( _strEq ) 
 //////////////////////////////////////////////////////////////////////////
 // word set 3 ( other primitive words )
 //////////////////////////////////////////////////////////////////////////
 // W300 char <char> ( -- ascii ) ascii code of given char.
 static void _char () { 
   char c=*(F.parseToken(' ')+1);
-  if(F.T->state&CMPLING) F.compile((Word*)&W_doLit), F.compile( (Word*)c );
+  if(F.T->state&CMPLING) F.compile( WORD( _doLit ) ), F.compile( (Word*)c );
   else F.dPush( (int)c ); }
-const Word W_char PROGMEM={LAST, 0x300, IMMED, "\x04" "char", _char, (int)"_char" };
-#define LAST (Word*)&W_char
+PRIMITIVE( 0x300, IMMED, "\x04" "char", _char, _char );
+#define LAST WORD( _char ) 
 //////////////////////////////////////////////////////////////////////////
 // W301 bl ( -- 0x20 ) ascii code of char blank.
-const Word W_bl PROGMEM={LAST, 0x301, 0, "\x02" "bl", _doCon, ' ' };
-#define LAST (Word*)&W_bl
+const Word W_bl PROGMEM = { LAST, 0x301, 0, "\x02" "bl", _doCon, ' ' };
+#define LAST WORD( _bl ) 
 //////////////////////////////////////////////////////////////////////////
 // W302 emit ( ascii -- ) print the char of given ascii code.
 static void _emit () { 
   WRITE(F.dPop()); }
-const Word W_emit PROGMEM={LAST, 0x302, 0, "\x04" "emit", _emit, (int)"_emit" };
-#define LAST (Word*)&W_emit
+PRIMITIVE( 0x302, 0, "\x04" "emit", _emit, _emit );
+#define LAST WORD( _emit ) 
 //////////////////////////////////////////////////////////////////////////
 // W303 print ( nStr -- ) print given nStr.
 static void _print () { 
   PRINT((char*)(F.dPop())+1); }
-const Word W_print PROGMEM={LAST, 0x303, 0, "\x05" "print", _print, (int)"_print" };
-#define LAST (Word*)&W_print
+PRIMITIVE( 0x303, 0, "\x05" "print", _print, _print );
+#define LAST WORD( _print ) 
 //////////////////////////////////////////////////////////////////////////
 // W304 type ( addr n -- ) print string of given number of chars at given address.
 static void _type () { char nch=F.dPop(), *adr=(char*)F.dPop(); while(*adr) WRITE(*adr++); }
-const Word W_type PROGMEM={LAST, 0x304, 0, "\x04" "type", _type, (int)"_type" };
-#define LAST (Word*)&W_type
+PRIMITIVE( 0x304, 0, "\x04" "type", _type, _type );
+#define LAST WORD( _type ) 
 //////////////////////////////////////////////////////////////////////////
 // W305 word <str> ( delimiter -- nStr ) parse string by given delimiter.
 static void _word () { 
   F.dPush( (int)F.parseToken( (char)F.dPop() ) ); }
-const Word W_word PROGMEM={LAST, 0x305, 0, "\x04" "word", _word, (int)"_word" };
-#define LAST (Word*)&W_word
+PRIMITIVE( 0x305, 0, "\x04" "word", _word, _word );
+#define LAST WORD( _word ) 
 //////////////////////////////////////////////////////////////////////////
 // W306 token <str> ( -- nStr ) parse string by white space (length trucated at 30).
 static void _token () { 
   char *tkn=F.parseToken(' '), n=*tkn; if(n>0x1f){ *tkn=n=0x1f, *(tkn+n+1)=0; } F.dPush( (int)tkn ); }
-const Word W_token PROGMEM={LAST, 0x306, 0, "\x05" "token", _token, (int)"_token" };
-#define LAST (Word*)&W_token
+PRIMITIVE( 0x306, 0, "\x05" "token", _token, _token );
+#define LAST WORD( _token ) 
 //////////////////////////////////////////////////////////////////////////
 // W307 eval ( nStr -- ) evaluate given nStr.
 static void _eval(){ F.eval((char*)F.dPop()); }
-const Word W_eval PROGMEM={LAST, 0x307, 0, "\x04" "eval", _eval, (int)"_eval" };
-#define LAST (Word*)&W_eval
+PRIMITIVE( 0x307, 0, "\x04" "eval", _eval, _eval );
+#define LAST WORD( _eval ) 
 //////////////////////////////////////////////////////////////////////////
 // W308 find  ( nStr -- word ) find the forth word which name is of given nStr.
 static void _find () { 
   Word*w=F.vocSearch((char*)F.dPop()); F.dPush((int)w); }
-const Word W_find PROGMEM={LAST, 0x308, 0, "\x04" "find", _find, (int)"_find" };
-#define LAST (Word*)&W_find
+PRIMITIVE( 0x308, 0, "\x04" "find", _find, _find );
+#define LAST WORD( _find ) 
 //////////////////////////////////////////////////////////////////////////
 // W309 ' ( <nStr> -- word ) find the forth word of given name.
 static void _tick () { 
   Word*w=F.vocSearch(F.parseToken(' ')); F.dPush((int)w); }
-const Word W_tick PROGMEM={LAST, 0x309, 0, "\x01" "'", _tick, (int)"_tick" };
-#define LAST (Word*)&W_tick
+PRIMITIVE( 0x309, 0, "\x01" "'", _tick, _tick );
+#define LAST WORD( _tick ) 
 //////////////////////////////////////////////////////////////////////////
 // W30a context ( -- lfa ) the address contain the last word defined.
 static void _context () { F.dPush((int)&(F.voc->context)); }
-const Word W_context PROGMEM={LAST, 0x30a, 0, "\x07" "context", _context, (int)"_context" };
-#define LAST (Word*)&W_context
+PRIMITIVE( 0x30a, 0, "\x07" "context", _context, _context );
+#define LAST WORD( _context ) 
 //////////////////////////////////////////////////////////////////////////
 // W30b ms ( n -- ) wait for n milli seconds
 static void _ms () {
   F.ms(F.dPop()); }
-const Word W_ms PROGMEM={LAST, 0x30b, 0, "\x02" "ms", _ms, (int)"_ms" };
-#define LAST (Word*)&W_ms
+PRIMITIVE( 0x30b, 0, "\x02" "ms", _ms, _ms );
+#define LAST WORD( _ms ) 
 //////////////////////////////////////////////////////////////////////////
 // W30f ." <string>" ( --  ) Print a string delimited by quote. compile only.
-static void _dotQ() { F.compile((Word*)&W_doStr), F.compile( (Word*)F.parseToken('"')), F.compile((Word*)&W_print); }
-const Word W_dotQ PROGMEM={LAST, 0x30f, IMMED_COMPO, "\x02" ".\"", _dotQ, (int)"_dotQ" };
-#define LAST (Word*)&W_dotQ
+static void _dotQ() { F.compile( WORD( _doStr ) ), F.compile( (Word*)F.parseToken('"')), F.compile( WORD( _print) ); }
+PRIMITIVE( 0x30f, IMMED_COMPO, "\x02" ".\"", _dotQ, _dotQ );
+#define LAST WORD( _dotQ ) 
 //////////////////////////////////////////////////////////////////////////
 // W310 .( <string>) ( --  ) Print a string delimited by right parenthesis.
 static void _dotP() { PRINT(F.parseToken(')')+1); }
-const Word W_dotP PROGMEM={LAST, 0x310, 0, "\x02" ".(", _dotP, (int)"_dotP" };
-#define LAST (Word*)&W_dotP
+PRIMITIVE( 0x310, 0, "\x02" ".(", _dotP, _dotP );
+#define LAST WORD( _dotP ) 
 //////////////////////////////////////////////////////////////////////////
 // W311 cr ( --  ) Print carriage return line feed.
 static void _cr() { PRINT("\r\n"); }
-const Word W_cr PROGMEM={LAST, 0x311, 0, "\x02" "cr", _cr, (int)"_cr" };
-#define LAST (Word*)&W_cr
+PRIMITIVE( 0x311, 0, "\x02" "cr", _cr, _cr );
+#define LAST WORD( _cr ) 
 //////////////////////////////////////////////////////////////////////////
 // word set 4 ( tools )
 //////////////////////////////////////////////////////////////////////////
@@ -845,25 +939,25 @@ const Word W_cr PROGMEM={LAST, 0x311, 0, "\x02" "cr", _cr, (int)"_cr" };
 //      words <substr> ( -- ) show all word names including given substring
 static void _words () {
   char *tkn=F.parseToken(' '); F.words(tkn); }
-const Word W_words PROGMEM={LAST, 0x400, 0, "\x05" "words", _words, (int)"_words" };
-#define LAST (Word*)&W_words
+PRIMITIVE( 0x400, 0, "\x05" "words", _words, _words );
+#define LAST WORD( _words ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 // W401 (see) ( w -- ) see the given word
 static void _psee   () { F.see((Word*)F.dPop()); }
-const Word W_psee PROGMEM={LAST, 0x401, 0, "\x05" "(see)", _psee, (int)"_psee" };
-#define LAST (Word*)&W_psee
+PRIMITIVE( 0x401, 0, "\x05" "(see)", _psee, _psee );
+#define LAST WORD( _psee ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 // W402 see <name>     ( -- ) see the word of given name
 static void _see   () { 
   F.see(F.vocSearch(F.parseToken(' '))); }
-const Word W_see PROGMEM={LAST, 0x402, 0, "\x03" "see", _see, (int)"_see" };
-#define LAST (Word*)&W_see
+PRIMITIVE( 0x402, 0, "\x03" "see", _see, _see );
+#define LAST WORD( _see ) 
 //////////////////////////////////////////////////////////////////////////
 // W403 dump           ( a n -- ) show n cells at address a
 static void _dump  () { 
   int X=F.dPop(); F.dump((int*)F.dPop(),X); }
-const Word W_dump PROGMEM={LAST, 0x403, 0, "\x04" "dump", _dump, (int)"_dump" };
-#define LAST (Word*)&W_dump
+PRIMITIVE( 0x403, 0, "\x04" "dump", _dump, _dump );
+#define LAST WORD( _dump ) 
 //////////////////////////////////////////////////////////////////////////
 // W404 trace <name>  ( ... -- ... ) trace the calling sequence of give forth colon word
 static void _trace  () { 
@@ -874,13 +968,13 @@ if ( ! *name ) { ABORT( F.T->error, 4030, F.initTib, "\"trace <name>\" ? word na
   F.T->W=w;
   F.see(w); PRINTF("\ntrace \"\\%d\" \"%s\" ", *name, name+1);
   F.T->tracing=1; w->code(); }
-const Word W_trace PROGMEM={LAST, 0x404, 0, "\x05" "trace", _trace, (int)"_trace" };
-#define LAST (Word*)&W_trace
+PRIMITIVE( 0x404, 0, "\x05" "trace", _trace, _trace );
+#define LAST WORD( _trace ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W405 seeAll ( -- ) see all words defined
 static void _seeAll(){
   Word *w=F.voc->context; int16_t lastId=F.voc->lastId, i=F.voc->nWord;
-  WRITE('\n');
+  PRINTF("\nall words seen as follows:");
   while(w){ int16_t id=w->id, flag=w->flag; char *name=w->name, n=*name++;
     if(id!=lastId && (lastId&0xff)!=0xff) PRINTF("\n\n??? id %04x not expected %04x ", id, lastId);
     PRINTF("\n%03d W%03x ", --i,id); lastId=id-1;
@@ -889,8 +983,8 @@ static void _seeAll(){
     F.see(w), w=w->link;
   }
 }
-const Word W_seeAll PROGMEM={LAST, 0x405, 0, "\x06" "seeAll", _seeAll, (int)"_seeAll" };
-#define LAST (Word*)&W_seeAll
+PRIMITIVE( 0x405, 0, "\x06" "seeAll", _seeAll, _seeAll );
+#define LAST WORD( _seeAll ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*
 // W406 dir ( <path> -- ) show directory of given path
@@ -940,88 +1034,88 @@ static void _dir(){
   	} else PRINTF( "\n  %6d 0x%x \"%s\" ", file.size(), strlen(fileName), fileName );
   }
 }
-const Word W_dir PROGMEM={LAST, 0x406, 0, "\x03" "dir", _dir, (int)"_dir" };
-#define LAST (Word*)&W_dir
+PRIMITIVE( 0x406, 0, "\x03" "dir", _dir, _dir );
+#define LAST WORD( _dir ) 
 */
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // word set 5 ( digital input/output words )
 //////////////////////////////////////////////////////////////////////////
 // W500 led ( -- pin  ) gpio pin number of led on back side of wb32
-const Word W_led PROGMEM={LAST, 0x500, 0, "\x03" "led", _doCon, 16 };
-#define LAST (Word*)&W_led
+const Word W_led PROGMEM = { LAST, 0x500, 0, "\x03" "led", _doCon, 16 };
+#define LAST WORD( _led ) 
 //////////////////////////////////////////////////////////////////////////
 // W501 pinMode ( pin mode -- ) set pin as INPUT or OUTPUT
 static void _pinMode () { int mode=F.dPop(); pinMode(F.dPop(),mode); }
-const Word W_pinMode PROGMEM={LAST, 0x501, 0, "\x07" "pinMode", _pinMode, (int)"_pinMode" };
-#define LAST (Word*)&W_pinMode
+PRIMITIVE( 0x501, 0, "\x07" "pinMode", _pinMode, _pinMode );
+#define LAST WORD( _pinMode ) 
 //////////////////////////////////////////////////////////////////////////
 // W502 INPUT ( -- mode ) pin mode INPUT
-const Word W_INPUT PROGMEM={LAST, 0x502, 0, "\x05" "INPUT", _doCon, INPUT };
-#define LAST (Word*)&W_INPUT
+const Word W_INPUT PROGMEM = { LAST, 0x502, 0, "\x05" "INPUT", _doCon, INPUT };
+#define LAST WORD( _INPUT ) 
 //////////////////////////////////////////////////////////////////////////
 // W503 OUTPUT ( -- mode ) pin mode OUTPUT
-const Word W_OUTPUT PROGMEM={LAST, 0x503, 0, "\x06" "OUTPUT", _doCon, OUTPUT };
-#define LAST (Word*)&W_OUTPUT
+const Word W_OUTPUT PROGMEM = { LAST, 0x503, 0, "\x06" "OUTPUT", _doCon, OUTPUT };
+#define LAST WORD( _OUTPUT ) 
 //////////////////////////////////////////////////////////////////////////
 // W504 digitalRead ( pin -- level ) read pin level
 static void _digitalRead  () { *(F.T->DP)=digitalRead (*(F.T->DP)); }
-const Word W_digitalRead PROGMEM={LAST, 0x504, 0, "\x0b" "digitalRead", _digitalRead , (int)"_digitalRead" };
-#define LAST (Word*)&W_digitalRead
+const Word W_digitalRead PROGMEM = { LAST, 0x504, 0, "\x0b" "digitalRead", _digitalRead , (int)"_digitalRead" };
+#define LAST WORD( _digitalRead ) 
 //////////////////////////////////////////////////////////////////////////
 // W505 digitalWrite ( pin level -- ) write pin to given level
 static void _digitalWrite  () { int level=F.dPop(); digitalWrite (F.dPop(),level); }
-const Word W_digitalWrite PROGMEM={LAST, 0x505, 0, "\x0c" "digitalWrite", _digitalWrite, (int)"_digitalWrite"};
-#define LAST (Word*)&W_digitalWrite
+const Word W_digitalWrite PROGMEM = { LAST, 0x505, 0, "\x0c" "digitalWrite", _digitalWrite, (int)"_digitalWrite"};
+#define LAST WORD( _digitalWrite ) 
 //////////////////////////////////////////////////////////////////////////
 // W506 HIGH ( -- level ) pin level HIGH
-const Word W_HIGH PROGMEM={LAST, 0x506, 0, "\x04" "HIGH", _doCon, HIGH };
-#define LAST (Word*)&W_HIGH
+const Word W_HIGH PROGMEM = { LAST, 0x506, 0, "\x04" "HIGH", _doCon, HIGH };
+#define LAST WORD( _HIGH ) 
 //////////////////////////////////////////////////////////////////////////
 // W507 LOW ( -- level ) pin level LOW
-const Word W_LOW PROGMEM={LAST, 0x507, 0, "\x03" "LOW", _doCon, LOW };
-#define LAST (Word*)&W_LOW
+const Word W_LOW PROGMEM = { LAST, 0x507, 0, "\x03" "LOW", _doCon, LOW };
+#define LAST WORD( _LOW ) 
 //////////////////////////////////////////////////////////////////////////
 // W508 output ( pin -- ) set pin mode as OUTPUT
 static void _output () { uint8_t pin=F.dPop(); pinMode(pin,OUTPUT); }
-const Word W_output PROGMEM={LAST, 0x508, 0, "\x06" "output", _output, (int)"_output" };
-#define LAST (Word*)&W_output
+PRIMITIVE( 0x508, 0, "\x06" "output", _output, _output );
+#define LAST WORD( _output ) 
 //////////////////////////////////////////////////////////////////////////
 // W509 pinOut ( pin level -- ) set pin to given level
 static void _pinOut () { uint8_t level=F.dPop(), pin=F.dPop(); PRINTF("\n digitalWrite(0x%x, 0x%x) @ ",pin, level), F.showTime(); digitalWrite(pin, level); }
-const Word W_pinOut PROGMEM={LAST, 0x509, 0, "\x06" "pinOut", _pinOut, (int)"_pinOut" };
-#define LAST (Word*)&W_pinOut
+PRIMITIVE( 0x509, 0, "\x06" "pinOut", _pinOut, _pinOut );
+#define LAST WORD( _pinOut ) 
 //////////////////////////////////////////////////////////////////////////
 // W50a high ( pin -- ) set pin to level HIGH
 static void _high () { F.dPush(HIGH), _pinOut(); }
-const Word W_high PROGMEM={LAST, 0x50a, 0, "\x04" "high", _high, (int)"_high" };
-#define LAST (Word*)&W_high
+PRIMITIVE( 0x50a, 0, "\x04" "high", _high, _high );
+#define LAST WORD( _high ) 
 //////////////////////////////////////////////////////////////////////////
 // W50b low ( pin -- ) set pin to level LOW
 static void _low () { F.dPush(LOW), _pinOut(); }
-const Word W_low PROGMEM={LAST, 0x50b, 0, "\x03" "low", _low, (int)"_low" };
-#define LAST (Word*)&W_low
+PRIMITIVE( 0x50b, 0, "\x03" "low", _low, _low );
+#define LAST WORD( _low ) 
 //////////////////////////////////////////////////////////////////////////
 // W50c toggle ( pin -- ) toggle pin level
 static void _toggle () { F.dPush(1-digitalRead(*(F.T->DP))); _pinOut(); }
-const Word W_toggle PROGMEM={LAST, 0x50c, 0, "\x06" "toggle", _toggle, (int)"_toggle" };
-#define LAST (Word*)&W_toggle
+PRIMITIVE( 0x50c, 0, "\x06" "toggle", _toggle, _toggle );
+#define LAST WORD( _toggle ) 
 //////////////////////////////////////////////////////////////////////////
 // W50d input ( pin -- ) set pin mode as INPUT
 static void _input(){
   uint8_t pin=F.dPop();
   pinMode(pin,INPUT); }
-const Word W_input PROGMEM={LAST, 0x50d, 0, "\x05" "input", _input, (int)"_input" };
-#define LAST (Word*)&W_input
+PRIMITIVE( 0x50d, 0, "\x05" "input", _input, _input );
+#define LAST WORD( _input ) 
 //////////////////////////////////////////////////////////////////////////
 // W50e pinIn ( pin - level ) read pin level
 static void _pinIn(){ // 21. pinin ( pin -- v ) read v from digital INPUT pin (v=0 for LOW or v=1 for HIGH)
   uint8_t pin=F.dPop(), level=digitalRead(pin);
 //PRINTF("\ndigitalRead(0x%x)=0x%x; ",pin, level);
   F.dPush(level); } 
-const Word W_pinIn PROGMEM={LAST, 0x50e, 0, "\x05" "pinIn", _pinIn, (int)"_pinin" };
-#define LAST (Word*)&W_pinIn
+PRIMITIVE( 0x50e, 0, "\x05" "pinIn", _pinIn, _pinIn );
+#define LAST WORD( _pinIn ) 
 //////////////////////////////////////////////////////////////////////////
-#define LAST (Word*)&W_pinIn
+#define LAST WORD( _pinIn ) 
 #endif WS05_H
 // ws06.h // wordset 06 ( defining words )
 #ifndef WS06_H
@@ -1033,86 +1127,86 @@ const Word* L_blinks[] PROGMEM = { &W_led, &W_output, &W_led, &W_high, &W_2times
   &W_doWhile, (Word*)9, &W_1minus, &W_led, &W_toggle, &W_doLit, (Word*)500, &W_ms,
   &W_doRepeat, (Word*)-10,
   &W_ret };
-const Word W_blinks PROGMEM={LAST, 0x600, 0, "\x06" "blinks", _doCol, (int)L_blinks };
-#define LAST (Word*)&W_blinks
+const Word W_blinks PROGMEM = { LAST, 0x600, 0, "\x06" "blinks", _doCol, (int)L_blinks };
+#define LAST WORD( _blinks ) 
 //////////////////////////////////////////////////////////////////////////
 // word set 7 ( all color code words )
 //////////////////////////////////////////////////////////////////////////
 // W700 wbBLACK ( -- color ) color=0x0000
-const Word W_wbBLACK PROGMEM={LAST, 0x700, 0, "\x07" "wbBLACK", _doCon, 0x0000 };
-#define LAST (Word*)&W_wbBLACK
+const Word W_wbBLACK PROGMEM = { LAST, 0x700, 0, "\x07" "wbBLACK", _doCon, 0x0000 };
+#define LAST WORD( _wbBLACK ) 
 //////////////////////////////////////////////////////////////////////////
 // W701 wbNAVY ( -- color ) color=0x0F00
-const Word W_wbNAVY PROGMEM={LAST, 0x701, 0, "\x06" "wbNAVY", _doCon, 0x0f00 };
-#define LAST (Word*)&W_wbNAVY
+const Word W_wbNAVY PROGMEM = { LAST, 0x701, 0, "\x06" "wbNAVY", _doCon, 0x0f00 };
+#define LAST WORD( _wbNAVY ) 
 //////////////////////////////////////////////////////////////////////////
 // W702 wbDARKGREEN ( -- color ) color=0xE003
-const Word W_wbDARKGREEN PROGMEM={LAST, 0x702, 0, "\x0b" "wbDARKGREEN", _doCon, 0xe003 };
-#define LAST (Word*)&W_wbDARKGREEN
+const Word W_wbDARKGREEN PROGMEM = { LAST, 0x702, 0, "\x0b" "wbDARKGREEN", _doCon, 0xe003 };
+#define LAST WORD( _wbDARKGREEN ) 
 //////////////////////////////////////////////////////////////////////////
 // W703 wbDARKCYAN ( -- color ) color=0xEF03
-const Word W_wbDARKCYAN PROGMEM={LAST, 0x703, 0, "\x0a" "wbDARKCYAN", _doCon, 0xef03 };
-#define LAST (Word*)&W_wbDARKCYAN
+const Word W_wbDARKCYAN PROGMEM = { LAST, 0x703, 0, "\x0a" "wbDARKCYAN", _doCon, 0xef03 };
+#define LAST WORD( _wbDARKCYAN ) 
 //////////////////////////////////////////////////////////////////////////
 // W704 wbMAROON ( -- color ) color=0x0078
-const Word W_wbMAROON PROGMEM={LAST, 0x704, 0, "\x08" "wbMAROON", _doCon, 0x0078 };
-#define LAST (Word*)&W_wbMAROON
+const Word W_wbMAROON PROGMEM = { LAST, 0x704, 0, "\x08" "wbMAROON", _doCon, 0x0078 };
+#define LAST WORD( _wbMAROON ) 
 //////////////////////////////////////////////////////////////////////////
 // W705 wbPURPLE ( -- color ) color=0x0F78
-const Word W_wbPURPLE PROGMEM={LAST, 0x705, 0, "\x08" "wbPURPLE", _doCon, 0x0f78 };
-#define LAST (Word*)&W_wbPURPLE
+const Word W_wbPURPLE PROGMEM = { LAST, 0x705, 0, "\x08" "wbPURPLE", _doCon, 0x0f78 };
+#define LAST WORD( _wbPURPLE ) 
 //////////////////////////////////////////////////////////////////////////
 // W706 wbOLIVE ( -- color ) color=0xE07B
-const Word W_wbOLIVE PROGMEM={LAST, 0x706, 0, "\x07" "wbOLIVE", _doCon, 0xe07b };
-#define LAST (Word*)&W_wbOLIVE
+const Word W_wbOLIVE PROGMEM = { LAST, 0x706, 0, "\x07" "wbOLIVE", _doCon, 0xe07b };
+#define LAST WORD( _wbOLIVE ) 
 //////////////////////////////////////////////////////////////////////////
 // W707 wbLIGHTGREY ( -- color ) color=0x18C6
-const Word W_wbLIGHTGREY PROGMEM={LAST, 0x707, 0, "\x0b" "wbLIGHTGREY", _doCon, 0x18c6 };
-#define LAST (Word*)&W_wbLIGHTGREY
+const Word W_wbLIGHTGREY PROGMEM = { LAST, 0x707, 0, "\x0b" "wbLIGHTGREY", _doCon, 0x18c6 };
+#define LAST WORD( _wbLIGHTGREY ) 
 //////////////////////////////////////////////////////////////////////////
 // W708 wbDARKGREY ( -- color ) color=0xEF7B
-const Word W_wbDARKGREY PROGMEM={LAST, 0x708, 0, "\x0a" "wbDARKGREY", _doCon, 0xef7b };
-#define LAST (Word*)&W_wbDARKGREY
+const Word W_wbDARKGREY PROGMEM = { LAST, 0x708, 0, "\x0a" "wbDARKGREY", _doCon, 0xef7b };
+#define LAST WORD( _wbDARKGREY ) 
 //////////////////////////////////////////////////////////////////////////
 // W709 wbBLUE ( -- color ) color=0x1F00
-const Word W_wbBLUE PROGMEM={LAST, 0x709, 0, "\x06" "wbBLUE", _doCon, 0x1f00 };
-#define LAST (Word*)&W_wbBLUE
+const Word W_wbBLUE PROGMEM = { LAST, 0x709, 0, "\x06" "wbBLUE", _doCon, 0x1f00 };
+#define LAST WORD( _wbBLUE ) 
 //////////////////////////////////////////////////////////////////////////
 // W70a wbGREEN ( -- color ) color=0xE007
-const Word W_wbGREEN PROGMEM={LAST, 0x70a, 0, "\x07" "wbGREEN", _doCon, 0xe007 };
-#define LAST (Word*)&W_wbGREEN
+const Word W_wbGREEN PROGMEM = { LAST, 0x70a, 0, "\x07" "wbGREEN", _doCon, 0xe007 };
+#define LAST WORD( _wbGREEN ) 
 //////////////////////////////////////////////////////////////////////////
 // W70b wbCYAN ( -- color ) color=0xFF07
-const Word W_wbCYAN PROGMEM={LAST, 0x70b, 0, "\x06" "wbCYAN", _doCon, 0xff07 };
-#define LAST (Word*)&W_wbCYAN
+const Word W_wbCYAN PROGMEM = { LAST, 0x70b, 0, "\x06" "wbCYAN", _doCon, 0xff07 };
+#define LAST WORD( _wbCYAN ) 
 //////////////////////////////////////////////////////////////////////////
 // W70c wbRED ( -- color ) color=0x00F8
-const Word W_wbRED PROGMEM={LAST, 0x70c, 0, "\x05" "wbRED", _doCon, 0x00f8 };
-#define LAST (Word*)&W_wbRED
+const Word W_wbRED PROGMEM = { LAST, 0x70c, 0, "\x05" "wbRED", _doCon, 0x00f8 };
+#define LAST WORD( _wbRED ) 
 //////////////////////////////////////////////////////////////////////////
 // W70d wbMAGENTA ( -- color ) color=0x1FF8
-const Word W_wbMAGENTA PROGMEM={LAST, 0x70d, 0, "\x09" "wbMAGENTA", _doCon, 0x1ff8 };
-#define LAST (Word*)&W_wbMAGENTA
+const Word W_wbMAGENTA PROGMEM = { LAST, 0x70d, 0, "\x09" "wbMAGENTA", _doCon, 0x1ff8 };
+#define LAST WORD( _wbMAGENTA ) 
 //////////////////////////////////////////////////////////////////////////
 // W70e wbYELLOW ( -- color ) color=0xE0FF
-const Word W_wbYELLOW PROGMEM={LAST, 0x70e, 0, "\x08" "wbYELLOW", _doCon, 0xe0ff };
-#define LAST (Word*)&W_wbYELLOW
+const Word W_wbYELLOW PROGMEM = { LAST, 0x70e, 0, "\x08" "wbYELLOW", _doCon, 0xe0ff };
+#define LAST WORD( _wbYELLOW ) 
 //////////////////////////////////////////////////////////////////////////
 // W70f wbWHITE ( -- color ) color=0xFFFF
-const Word W_wbWHITE PROGMEM={LAST, 0x70f, 0, "\x07" "wbWHITE", _doCon, 0xffff };
-#define LAST (Word*)&W_wbWHITE
+const Word W_wbWHITE PROGMEM = { LAST, 0x70f, 0, "\x07" "wbWHITE", _doCon, 0xffff };
+#define LAST WORD( _wbWHITE ) 
 //////////////////////////////////////////////////////////////////////////
 // W710 wbORANGE ( -- color ) color=0x20FD
-const Word W_wbORANGE PROGMEM={LAST, 0x710, 0, "\x08" "wbORANGE", _doCon, 0x20fd };
-#define LAST (Word*)&W_wbORANGE
+const Word W_wbORANGE PROGMEM = { LAST, 0x710, 0, "\x08" "wbORANGE", _doCon, 0x20fd };
+#define LAST WORD( _wbORANGE ) 
 //////////////////////////////////////////////////////////////////////////
 // W711 wbGREENYELLOW ( -- color ) color=0xE5AF
-const Word W_wbGREENYELLOW PROGMEM={LAST, 0x711, 0, "\x0d" "wbGREENYELLOW", _doCon, 0xe5af };
-#define LAST (Word*)&W_wbGREENYELLOW
+const Word W_wbGREENYELLOW PROGMEM = { LAST, 0x711, 0, "\x0d" "wbGREENYELLOW", _doCon, 0xe5af };
+#define LAST WORD( _wbGREENYELLOW ) 
 //////////////////////////////////////////////////////////////////////////
 // W712 wbPINK ( -- color ) color=0x1FF8
-const Word W_wbPINK PROGMEM={LAST, 0x712, 0, "\x06" "wbPINK", _doCon, 0x1ff8 };
-#define LAST (Word*)&W_wbPINK
+const Word W_wbPINK PROGMEM = { LAST, 0x712, 0, "\x06" "wbPINK", _doCon, 0x1ff8 };
+#define LAST WORD( _wbPINK ) 
 //////////////////////////////////////////////////////////////////////////
 // W713 _wbColor ( i -- color ) color of given index
 #define nColor 0x13
@@ -1121,43 +1215,43 @@ const uint16_t wbColor[nColor] PROGMEM = {
   0xef7b, 0x1f00, 0xe007, 0xff07, 0x00f8, 0x1ff8, 0xe0ff, 0xffff,
   0x20fd, 0xe5af, 0x1ff8 };
 static void _wbColor(){ F.dPush(wbColor[(F.dPop())%nColor]); }
-const Word W_wbColor PROGMEM={LAST, 0x713, 0, "\x08" "_wbColor", _wbColor, (int)"_wbColor" };
-#define LAST (Word*)&W_wbColor
+PRIMITIVE( 0x713, 0, "\x08" "_wbColor", _wbColor, _wbColor );
+#define LAST WORD( _wbColor ) 
 //////////////////////////////////////////////////////////////////////////
 // W716 btLR ( -- pin ) the Left  Red    button
 #define btLR     32
-const Word W_btLR PROGMEM={LAST, 0x716, 0, "\x04" "btLR", _doCon, btLR };
-#define LAST (Word*)&W_btLR
+const Word W_btLR PROGMEM = { LAST, 0x716, 0, "\x04" "btLR", _doCon, btLR };
+#define LAST WORD( _btLR ) 
 //////////////////////////////////////////////////////////////////////////
 // W717 btLG ( -- pin ) the Left  Green  button
 #define btLG     33
-const Word W_btLG PROGMEM={LAST, 0x717, 0, "\x04" "btLG", _doCon, btLG };
-#define LAST (Word*)&W_btLG
+const Word W_btLG PROGMEM = { LAST, 0x717, 0, "\x04" "btLG", _doCon, btLG };
+#define LAST WORD( _btLG ) 
 //////////////////////////////////////////////////////////////////////////
 // W718 btRB ( -- pin ) the Right Blue   button
 #define btRB     34
-const Word W_btRB PROGMEM={LAST, 0x718, 0, "\x04" "btRB", _doCon, btRB };
-#define LAST (Word*)&W_btRB
+const Word W_btRB PROGMEM = { LAST, 0x718, 0, "\x04" "btRB", _doCon, btRB };
+#define LAST WORD( _btRB ) 
 //////////////////////////////////////////////////////////////////////////
 // W719 btRY ( -- pin ) the Right Yellow button
 #define btRY     35
-const Word W_btRY PROGMEM={LAST, 0x719, 0, "\x04" "btRY", _doCon, btRY };
-#define LAST (Word*)&W_btRY
+const Word W_btRY PROGMEM = { LAST, 0x719, 0, "\x04" "btRY", _doCon, btRY };
+#define LAST WORD( _btRY ) 
 //////////////////////////////////////////////////////////////////////////
 // W71a btSTART ( -- pin ) the small  right button
 #define btSTART  23
-const Word W_btSTART PROGMEM={LAST, 0x71a, 0, "\x07" "btSTART", _doCon, btSTART };
-#define LAST (Word*)&W_btSTART
+const Word W_btSTART PROGMEM = { LAST, 0x71a, 0, "\x07" "btSTART", _doCon, btSTART };
+#define LAST WORD( _btSTART ) 
 //////////////////////////////////////////////////////////////////////////
 // W71b btSELECT ( -- pin ) the small  left button
 #define btSELECT 39
-const Word W_btSELECT PROGMEM={LAST, 0x71b, 0, "\x08" "btSELECT", _doCon, btSELECT };
-#define LAST (Word*)&W_btSELECT
+const Word W_btSELECT PROGMEM = { LAST, 0x71b, 0, "\x08" "btSELECT", _doCon, btSELECT };
+#define LAST WORD( _btSELECT ) 
 //////////////////////////////////////////////////////////////////////////
 // W71c btPROG ( -- pin ) the small  top button on back side
 #define btPROG    0
-const Word W_btPROG PROGMEM={LAST, 0x71c, 0, "\x06" "btPROG", _doCon, btPROG };
-#define LAST (Word*)&W_btPROG
+const Word W_btPROG PROGMEM = { LAST, 0x71c, 0, "\x06" "btPROG", _doCon, btPROG };
+#define LAST WORD( _btPROG ) 
 //////////////////////////////////////////////////////////////////////////
 const int8_t buttons[7] = { btPROG, btLG, btSTART, btLR, btRY, btRB, btSELECT };
 //////////////////////////////////////////////////////////////////////////
@@ -1168,8 +1262,8 @@ const int8_t buttons[7] = { btPROG, btLG, btSTART, btLR, btRY, btRB, btSELECT };
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W800 lcdInit ( -- ) linitialize lcd
 static void _lcdInit(){ lcdInit(); }
-const Word W_lcdInit PROGMEM={LAST, 0x800, 0, "\x07" "lcdInit", lcdInit, (int)"lcdInit" };
-#define LAST (Word*)&W_lcdInit
+const Word W_lcdInit PROGMEM = { LAST, 0x800, 0, "\x07" "lcdInit", lcdInit, (int)"lcdInit" };
+#define LAST WORD( _lcdInit ) 
 */
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W801 wb_setAddrWindow ( x0 y0 x1 y1 -- ) set window rect
@@ -1178,16 +1272,16 @@ static void _wb_setAddrWindow(){
   uint16_t y0=(uint16_t)(F.dPop()), x0=(uint16_t)(F.dPop());
   wb_setAddrWindow(x0, y0, x1, y1);
 }
-const Word W_wb_setAddrWindow PROGMEM={LAST, 0x801, 0, "\x10" "wb_setAddrWindow", _wb_setAddrWindow, (int)"_wb_setAddrWindow" };
-#define LAST (Word*)&W_wb_setAddrWindow
+PRIMITIVE( 0x801, 0, "\x10" "wb_setAddrWindow", _wb_setAddrWindow, _wb_setAddrWindow );
+#define LAST WORD( _wb_setAddrWindow ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W802 wb_fillScreen ( color -- ) fill screen by given color
 static void _wb_fillScreen(){
   uint16_t color=(uint16_t)(F.dPop());
   wb_fillScreen(color);
 }
-const Word W_wb_fillScreen PROGMEM={LAST, 0x802, 0, "\x0d" "wb_fillScreen", _wb_fillScreen, (int)"_wb_fillScreen" };
-#define LAST (Word*)&W_wb_fillScreen
+PRIMITIVE( 0x802, 0, "\x0d" "wb_fillScreen", _wb_fillScreen, _wb_fillScreen );
+#define LAST WORD( _wb_fillScreen ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W803 wb_fillRect ( x y w h color -- ) fill rect by given color
 static void _wb_fillRect(){
@@ -1196,8 +1290,8 @@ static void _wb_fillRect(){
   int16_t y=(int16_t)(F.dPop()), x=(int16_t)(F.dPop());
   wb_fillRect(x, y, w, h, color);
 }
-const Word W_wb_fillRect PROGMEM={LAST, 0x803, 0, "\x0b" "wb_fillRect", _wb_fillRect, (int)"_wb_fillRect" };
-#define LAST (Word*)&W_wb_fillRect
+PRIMITIVE( 0x803, 0, "\x0b" "wb_fillRect", _wb_fillRect, _wb_fillRect );
+#define LAST WORD( _wb_fillRect ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W804 wb_drawPixel ( x y color -- ) at x,y draw pixel of given color
 static void _wb_drawPixel(){
@@ -1206,16 +1300,16 @@ static void _wb_drawPixel(){
   uint16_t x=(uint16_t)(F.dPop());
   wb_drawPixel(x, y, color);
 }
-const Word W_wb_drawPixel PROGMEM={LAST, 0x804, 0, "\x0c" "wb_drawPixel", _wb_drawPixel, (int)"_wb_drawPixel" };
-#define LAST (Word*)&W_wb_drawPixel
+PRIMITIVE( 0x804, 0, "\x0c" "wb_drawPixel", _wb_drawPixel, _wb_drawPixel );
+#define LAST WORD( _wb_drawPixel ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W805 wb_pushColor ( color -- ) push given color
 static void _wb_pushColor(){
   uint16_t color=(uint16_t)(F.dPop());
   wb_pushColor(color);
 }
-const Word W_wb_pushColor PROGMEM={LAST, 0x805, 0, "\x0c" "wb_pushColor", _wb_pushColor, (int)"_wb_pushColor" };
-#define LAST (Word*)&W_wb_pushColor
+PRIMITIVE( 0x805, 0, "\x0c" "wb_pushColor", _wb_pushColor, _wb_pushColor );
+#define LAST WORD( _wb_pushColor ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W806 wb_drawFastVLine ( x y h color -- ) draw vertical line at x,y of hight h
 static void _wb_drawFastVLine(){
@@ -1225,8 +1319,8 @@ static void _wb_drawFastVLine(){
   int16_t x=(int16_t)(F.dPop());
   wb_drawFastVLine(x, y, h, color);
 }
-const Word W_wb_drawFastVLine PROGMEM={LAST, 0x806, 0, "\x10" "wb_drawFastVLine", _wb_drawFastVLine, (int)"_wb_drawFastVLine" };
-#define LAST (Word*)&W_wb_drawFastVLine
+PRIMITIVE( 0x806, 0, "\x10" "wb_drawFastVLine", _wb_drawFastVLine, _wb_drawFastVLine );
+#define LAST WORD( _wb_drawFastVLine ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W807 wb_drawFastHLine ( x y w color -- ) draw horizontal line at x,y of width w
 static void _wb_drawFastHLine(){
@@ -1236,8 +1330,8 @@ static void _wb_drawFastHLine(){
   int16_t x=(int16_t)(F.dPop());
   wb_drawFastHLine(x, y, w, color);
 }
-const Word W_wb_drawFastHLine PROGMEM={LAST, 0x807, 0, "\x10" "wb_drawFastHLine", _wb_drawFastHLine, (int)"_wb_drawFastHLine" };
-#define LAST (Word*)&W_wb_drawFastHLine
+PRIMITIVE( 0x807, 0, "\x10" "wb_drawFastHLine", _wb_drawFastHLine, _wb_drawFastHLine );
+#define LAST WORD( _wb_drawFastHLine ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W808 wb_drawRect ( x y w color -- ) draw rect at x,y of width w hight h
 static void _wb_drawRect(){
@@ -1248,8 +1342,8 @@ static void _wb_drawRect(){
   int16_t x=(int16_t)(F.dPop());
   wb_drawRect(x, y, w, h, color);
 }
-const Word W_wb_drawRect PROGMEM={LAST, 0x808, 0, "\x0b" "wb_drawRect", _wb_drawRect, (int)"_wb_drawRect" };
-#define LAST (Word*)&W_wb_drawRect
+PRIMITIVE( 0x808, 0, "\x0b" "wb_drawRect", _wb_drawRect, _wb_drawRect );
+#define LAST WORD( _wb_drawRect ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W809 wb_drawLine ( x0 y0 x1 y1 color w -- ) draw color line from x0,y0 to x1,y1 of width w
 static void _wb_drawLine(){
@@ -1261,8 +1355,8 @@ static void _wb_drawLine(){
   int16_t x0=(int16_t)(F.dPop());
   wb_drawLine(x0, y0, x1, y1, color, w);
 }
-const Word W_wb_drawLine PROGMEM={LAST, 0x809, 0, "\x0b" "wb_drawLine", _wb_drawLine, (int)"_wb_drawLine" };
-#define LAST (Word*)&W_wb_drawLine
+PRIMITIVE( 0x809, 0, "\x0b" "wb_drawLine", _wb_drawLine, _wb_drawLine );
+#define LAST WORD( _wb_drawLine ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W80a wb_drawCircle ( x y r color w -- ) draw color circle at x,y of radius r width w
 static void _wb_drawCircle(){
@@ -1273,8 +1367,8 @@ static void _wb_drawCircle(){
   int16_t x=(int16_t)(F.dPop());
   wb_drawCircle(x, y, r, color, w);
 }
-const Word W_wb_drawCircle PROGMEM={LAST, 0x80a, 0, "\x0d" "wb_drawCircle", _wb_drawCircle, (int)"_wb_drawCircle" };
-#define LAST (Word*)&W_wb_drawCircle
+PRIMITIVE( 0x80a, 0, "\x0d" "wb_drawCircle", _wb_drawCircle, _wb_drawCircle );
+#define LAST WORD( _wb_drawCircle ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W80b wb_drawCorner ( x y r corner color w -- ) draw color corner at x,y of radius r width w
 static void _wb_drawCorner(){
@@ -1286,8 +1380,8 @@ static void _wb_drawCorner(){
   int16_t x=(int16_t)(F.dPop());
   wb_drawCorner(x, y, r, corner, color, w);
 }
-const Word W_wb_drawCorner PROGMEM={LAST, 0x80b, 0, "\x0d" "wb_drawCorner", _wb_drawCorner, (int)"_wb_drawCorner" };
-#define LAST (Word*)&W_wb_drawCorner
+PRIMITIVE( 0x80b, 0, "\x0d" "wb_drawCorner", _wb_drawCorner, _wb_drawCorner );
+#define LAST WORD( _wb_drawCorner ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W80c wb_fillCircle ( x y radius cornername delta color -- ) fill circle at x,y with given radius cornername delta color
 static void _wb_fillCircle(){
@@ -1299,8 +1393,8 @@ static void _wb_fillCircle(){
   int16_t x=(int16_t)(F.dPop());
   wb_fillCircle(x, y, radius, cornername, delta, color);
 }
-const Word W_wb_fillCircle PROGMEM={LAST, 0x80c, 0, "\x0d" "wb_fillCircle", _wb_fillCircle, (int)"_wb_fillCircle" };
-#define LAST (Word*)&W_wb_fillCircle
+PRIMITIVE( 0x80c, 0, "\x0d" "wb_fillCircle", _wb_fillCircle, _wb_fillCircle );
+#define LAST WORD( _wb_fillCircle ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W80d wb_fillCircle2 ( x y radius color -- ) fill circle at x,y with given radius color
 static void _wb_fillCircle2(){
@@ -1310,8 +1404,8 @@ static void _wb_fillCircle2(){
   int16_t x=(int16_t)(F.dPop());
   wb_fillCircle2(x, y, r, color);
 }
-const Word W_wb_fillCircle2 PROGMEM={LAST, 0x80d, 0, "\xe" "wb_fillCircle2", _wb_fillCircle2, (int)"_wb_fillCircle2" };
-#define LAST (Word*)&W_wb_fillCircle2
+PRIMITIVE( 0x80d, 0, "\xe" "wb_fillCircle2", _wb_fillCircle2, _wb_fillCircle2 );
+#define LAST WORD( _wb_fillCircle2 ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W80e wb_drawImage ( x y w h image -- ) draw w*h image at x,y
 static void _wb_drawImage(){
@@ -1323,8 +1417,8 @@ static void _wb_drawImage(){
   uint16_t x=(uint16_t)(F.dPop());
   wb_drawImage(x, y, w, h, image);
 }
-const Word W_wb_drawImage PROGMEM={LAST, 0x80e, 0, "\xc" "wb_drawImage", _wb_drawImage, (int)"_wb_drawImage" };
-#define LAST (Word*)&W_wb_drawImage
+PRIMITIVE( 0x80e, 0, "\xc" "wb_drawImage", _wb_drawImage, _wb_drawImage );
+#define LAST WORD( _wb_drawImage ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W80f wb_setTextColor ( color bgColor -- ) set color and background color for text
 static void _wb_setTextColor(){
@@ -1332,8 +1426,8 @@ static void _wb_setTextColor(){
   uint16_t color=(uint16_t)(F.dPop());
   wb_setTextColor(color, bgColor);
 }
-const Word W_wb_setTextColor PROGMEM={LAST, 0x80f, 0, "\xf" "wb_setTextColor", _wb_setTextColor, (int)"_wb_setTextColor" };
-#define LAST (Word*)&W_wb_setTextColor
+PRIMITIVE( 0x80f, 0, "\xf" "wb_setTextColor", _wb_setTextColor, _wb_setTextColor );
+#define LAST WORD( _wb_setTextColor ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W810 wb_drawString ( str x y size type -- ) at x,y draw string of given size type 
 static void _wb_drawString(){
@@ -1344,8 +1438,8 @@ static void _wb_drawString(){
   const char *str=(const char *)(F.dPop());
   F.dPush( wb_drawString(str, x, y, size, type) );
 }
-const Word W_wb_drawString PROGMEM={LAST, 0x810, 0, "\x0d" "wb_drawString", _wb_drawString, (int)"_wb_drawString" };
-#define LAST (Word*)&W_wb_drawString
+PRIMITIVE( 0x810, 0, "\x0d" "wb_drawString", _wb_drawString, _wb_drawString );
+#define LAST WORD( _wb_drawString ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W811 wb_drawChar ( uniCode x y size type -- w ) at x,y draw char of given uniCode size type, return width
 static void _wb_drawChar(){
@@ -1356,8 +1450,8 @@ static void _wb_drawChar(){
   uint16_t uniCode=(uint16_t)(F.dPop());
   F.dPush( wb_drawChar(uniCode, x, y, size, type) );
 }
-const Word W_wb_drawChar PROGMEM={LAST, 0x811, 0, "\x0b" "wb_drawChar", _wb_drawChar, (int)"_wb_drawChar" };
-#define LAST (Word*)&W_wb_drawChar
+PRIMITIVE( 0x811, 0, "\x0b" "wb_drawChar", _wb_drawChar, _wb_drawChar );
+#define LAST WORD( _wb_drawChar ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W812 wb_color565 ( r g b -- color ) get color code of given r g b
 static void _wb_color565(){
@@ -1366,13 +1460,14 @@ static void _wb_color565(){
   uint8_t r=(uint8_t)(F.dPop());
   F.dPush( (long)wb_color565(r, g, b) );
 }
-const Word W_wb_color565 PROGMEM={LAST, 0x812, 0, "\x0b" "wb_color565", _wb_color565, (int)"_wb_color565" };
-#define LAST (Word*)&W_wb_color565
+PRIMITIVE( 0x812, 0, "\x0b" "wb_color565", _wb_color565, _wb_color565 );
+#define LAST WORD( _wb_color565 ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W813 wb_init ( -- ) initialize graphics system
-static void _wb_init(){ wb_init(1); }
-const Word W_wb_init PROGMEM={LAST, 0x813, 0, "\x07" "wb_init", _wb_init, (int)"_wb_init" };
-#define LAST (Word*)&W_wb_init
+static int _wb_init_done = 0;
+static void _wb_init(){ if( _wb_init_done ) return; _wb_init_done = 1; wb_init(1); }
+PRIMITIVE( 0x813, 0, "\x07" "wb_init", _wb_init, _wb_init );
+#define LAST WORD( _wb_init ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W814 wb_setPal8 ( i -- color ) set palette of i-th color
 static void _wb_setPal8(){
@@ -1380,12 +1475,12 @@ static void _wb_setPal8(){
   uint8_t color=(uint8_t)(F.dPop());
   wb_setPal8(i, color);
 }
-const Word W_wb_setPal8 PROGMEM={LAST, 0x814, 0, "\x0a" "wb_setPal8", _wb_setPal8, (int)"_wb_setPal8" };
-#define LAST (Word*)&W_wb_setPal8
+PRIMITIVE( 0x814, 0, "\x0a" "wb_setPal8", _wb_setPal8, _wb_setPal8 );
+#define LAST WORD( _wb_setPal8 ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W815 wb_blit8 ( -- )
-const Word W_wb_blit8 PROGMEM={LAST, 0x815, 0, "\x08" "wb_blit8", wb_blit8, (int)"wb_blit8" };
-#define LAST (Word*)&W_wb_blit8
+const Word W_wb_blit8 PROGMEM = { LAST, 0x815, 0, "\x08" "wb_blit8", wb_blit8, (int)"wb_blit8" };
+#define LAST WORD( _wb_blit8 ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W816 wb_blit8 ( xs ys ws xd yd width height image -- )
 static void _wb_blitBuf8(){
@@ -1399,8 +1494,8 @@ static void _wb_blitBuf8(){
   uint16_t xs=(uint16_t)(F.dPop());
   wb_blitBuf8(xs, ys, ws, xd, yd, width, height, image);
 }
-const Word W_wb_blitBuf8 PROGMEM={LAST, 0x816, 0, "\x0b" "wb_blitBuf8", _wb_blitBuf8, (int)"_wb_blitBuf8" };
-#define LAST (Word*)&W_wb_blitBuf8
+PRIMITIVE( 0x816, 0, "\x0b" "wb_blitBuf8", _wb_blitBuf8, _wb_blitBuf8 );
+#define LAST WORD( _wb_blitBuf8 ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W817 wb_rot8 ( dx dy angle scale offx offy w h sprite -- )
 static void _wb_rot8(){
@@ -1415,8 +1510,8 @@ static void _wb_rot8(){
   uint16_t dx=(uint16_t)(F.dPop());
   wb_rot8(dx, dy, angle, scale, offx, offy, w, h, sprite);
 }
-const Word W_wb_rot8 PROGMEM={LAST, 0x817, 0, "\x07" "wb_rot8", _wb_rot8, (int)"_wb_rot8" };
-#define LAST (Word*)&W_wb_rot8
+PRIMITIVE( 0x817, 0, "\x07" "wb_rot8", _wb_rot8, _wb_rot8 );
+#define LAST WORD( _wb_rot8 ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W818 wb_setBuf8 ( i d -- )
 static void _wb_setBuf8(){
@@ -1424,16 +1519,16 @@ static void _wb_setBuf8(){
   uint32_t i=(uint32_t)(F.dPop());
   wb_setBuf8(i, d);
 }
-const Word W_wb_setBuf8 PROGMEM={LAST, 0x818, 0, "\x0a" "wb_setBuf8", _wb_setBuf8, (int)"_wb_setBuf8" };
-#define LAST (Word*)&W_wb_setBuf8
+PRIMITIVE( 0x818, 0, "\x0a" "wb_setBuf8", _wb_setBuf8, _wb_setBuf8 );
+#define LAST WORD( _wb_setBuf8 ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W819 wb_initBuf8 ( -- )
-const Word W_wb_initBuf8 PROGMEM={LAST, 0x819, 0, "\x0b" "wb_initBuf8", wb_initBuf8, (int)"wb_initBuf8" };
-#define LAST (Word*)&W_wb_initBuf8
+const Word W_wb_initBuf8 PROGMEM = { LAST, 0x819, 0, "\x0b" "wb_initBuf8", wb_initBuf8, (int)"wb_initBuf8" };
+#define LAST WORD( _wb_initBuf8 ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W81a wb_clearBuf8 ( -- )
-const Word W_wb_clearBuf8 PROGMEM={LAST, 0x81a, 0, "\x0c" "wb_clearBuf8", wb_clearBuf8, (int)"wb_clearBuf8" };
-#define LAST (Word*)&W_wb_clearBuf8
+const Word W_wb_clearBuf8 PROGMEM = { LAST, 0x81a, 0, "\x0c" "wb_clearBuf8", wb_clearBuf8, (int)"wb_clearBuf8" };
+#define LAST WORD( _wb_clearBuf8 ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W81b wb_tickerInit ( us code -- )
 static void _wb_tickerInit(){
@@ -1441,21 +1536,21 @@ static void _wb_tickerInit(){
   uint32_t us=(uint32_t)(F.dPop());
   wb_tickerInit(us, code);
 }
-const Word W_wb_tickerInit PROGMEM={LAST, 0x81b, 0, "\x0d" "wb_tickerInit", _wb_tickerInit, (int)"_wb_tickerInit" };
-#define LAST (Word*)&W_wb_tickerInit
+PRIMITIVE( 0x81b, 0, "\x0d" "wb_tickerInit", _wb_tickerInit, _wb_tickerInit );
+#define LAST WORD( _wb_tickerInit ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W81c wb_tickerAlarm ( us -- )
 static void _wb_tickerAlarm(){ uint32_t us=(uint32_t)(F.dPop()); wb_tickerAlarm(us); }
-const Word W_wb_tickerAlarm PROGMEM={LAST, 0x81c, 0, "\x0e" "wb_tickerAlarm", _wb_tickerAlarm, (int)"_wb_tickerAlarm" };
-#define LAST (Word*)&W_wb_tickerAlarm
+PRIMITIVE( 0x81c, 0, "\x0e" "wb_tickerAlarm", _wb_tickerAlarm, _wb_tickerAlarm );
+#define LAST WORD( _wb_tickerAlarm ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W81d wb_tickerEnable ( -- )
-const Word W_wb_tickerEnable PROGMEM={LAST, 0x81d, 0, "\x0f" "wb_tickerEnable", wb_tickerEnable, (int)"wb_tickerEnable" };
-#define LAST (Word*)&W_wb_tickerEnable
+const Word W_wb_tickerEnable PROGMEM = { LAST, 0x81d, 0, "\x0f" "wb_tickerEnable", wb_tickerEnable, (int)"wb_tickerEnable" };
+#define LAST WORD( _wb_tickerEnable ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W81e wb_tickerDisable ( -- )
-const Word W_wb_tickerDisable PROGMEM={LAST, 0x81e, 0, "\x10" "wb_tickerDisable", wb_tickerDisable, (int)"wb_tickerDisable" };
-#define LAST (Word*)&W_wb_tickerDisable
+const Word W_wb_tickerDisable PROGMEM = { LAST, 0x81e, 0, "\x10" "wb_tickerDisable", wb_tickerDisable, (int)"wb_tickerDisable" };
+#define LAST WORD( _wb_tickerDisable ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W81f wb_drawNString ( nStr x y size type -- ) at x,y draw string of given size type 
 static void _wb_drawNString(){
@@ -1466,13 +1561,13 @@ static void _wb_drawNString(){
   const char *nStr=(const char *)(F.dPop());
   F.dPush( wb_drawString(nStr+1, x, y, size, type) );
 }
-const Word W_wb_drawNString PROGMEM={LAST, 0x81f, 0, "\x0e" "wb_drawNString", _wb_drawNString, (int)"_wb_drawNString" };
-#define LAST (Word*)&W_wb_drawNString
+PRIMITIVE( 0x81f, 0, "\x0e" "wb_drawNString", _wb_drawNString, _wb_drawNString );
+#define LAST WORD( _wb_drawNString ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 #define imgLIMIT 0x2800
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W820 img ( -- img ) 128x160 color image for testing
-const uint32_t _img[imgLIMIT+1]={
+const uint32_t _img[imgLIMIT+1] = { 
   imgLIMIT,0xe320e320,0xe320e320,0xe320e320,0xe320e320,0xe318e318,0xe318e318,0xe318e318, 
 0xe318e318,0xe320e320,0xe320e320,0xe320e320,0xe320e320,0xe320e320,0xe320e320,0xe320e320, 
 0xe320e320,0xe418e418,0xe420e418,0xe418e418,0xe418e418,0xe418e418,0xe318e418,0xe420e418, 
@@ -2754,14 +2849,14 @@ const uint32_t _img[imgLIMIT+1]={
 0x44416541,0xa6516549,0xc6598551,0x4d8b0c83,0x696a6a6a,0xcc7acb7a,0x6e8bab72,0x6a622d83, 
 0xcc724962,0x2d83ed7a,0xcb72cb72,0x29624962,0xab72ab72,0x696a4862,0xeb820c8b,0x4862696a, 
 0x075ac751};
-const Word W_img PROGMEM={LAST, 0x820, 0, "\x03" "img", _doCon, (int)_img };
-#define LAST (Word*)&W_img
+const Word W_img PROGMEM = { LAST, 0x820, 0, "\x03" "img", _doCon, (int)_img };
+#define LAST WORD( _img ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // word set 09 ( extention words )
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // W900 predefined ( -- w ) The last predefined word.
-const Word W_predefined PROGMEM={LAST, 0x900, 0, "\x0a" "predefined", _doCon, (int)&W_predefined };
-#define LAST (Word*)&W_predefined
+const Word W_predefined PROGMEM = { LAST, 0x900, 0, "\x0a" "predefined", _doCon, (int)&W_predefined };
+#define LAST WORD( _predefined ) 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 Word* word_set=LAST;
 #endif WORD_SET_H
