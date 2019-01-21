@@ -35,7 +35,7 @@ This project is derived from my blink01 (https://github.com/samsuanchen/blink01)
 08. A forth script in test.txt as follows could be pasted into Arduino IDE input box:
 
         wb_init ( initialize wifiboy lib )
-        0 0 128 160 img wb_drawImage ( draw image 周子瑜 )
+        0 0 128 160 img wb_drawImage ( draw image tsuzu )
         2000 ms ( wait 2000 ms )
         : drawLines ( define a code to draw lines )
           42 for 1 1 r@ 3 * 1+ 159 wbRED 1 wb_drawLine next 
