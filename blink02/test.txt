@@ -1,9 +1,8 @@
-The following could be pasted into Arduino IDE console
-input box and click "Send" to draw image, lines, and 
-characters on WIFIBOY screen:
-
+ ( The following could be pasted into Arduino IDE console
+   input box and click "Send" to draw image, lines, and 
+   characters on WIFIBOY screen )
  wb_init ( initialize wifiboy 32 graphics )
- 0 0 128 160 img wb_drawImage ( draw image 周子瑜 )
+ 0 0 128 160 img wb_drawImage ( draw image stuyu )
  2000 ms ( wait 2000 ms )
  : drawLines ( define a code to draw lines )
    42 for 1 1 r@ 3 * 1+ 159 wbRED 1 wb_drawLine next 
